@@ -1,5 +1,11 @@
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
-  theme: { extend: {} },
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'], // ou 'Poppins'
+      },
+    },
+  },
   plugins: [],
 }
