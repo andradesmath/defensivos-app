@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
-import { AlertTriangle, AlertOctagon, PackageX, PackageMinus, Plus, Trash2, Pencil, X, Check, Package, Search, History } from "lucide-react";
+import {
+  AlertTriangle, AlertOctagon, PackageX, PackageMinus,
+  Plus, Trash2, Pencil, X, Check, Package, Search, History,
+  LayoutDashboard, Clock, Layers, Home
+} from "lucide-react";
 import { supabase } from "./supabaseClient";
 
 const DIAS_ALERTA_VENCIMENTO = 90;
@@ -192,94 +196,142 @@ export default function App() {
     return [...lista].sort((a, b) => (a.dias ?? 9999) - (b.dias ?? 9999));
   }, [itensComStatus, filtroAlerta, busca]);
 
+  // ---------- JSX com novo design ----------
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50 p-4 sm:p-8">
-      <div className="max-w-5xl mx-auto">
-        <header className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-600 to-teal-700 rounded-3xl p-6 sm:p-8 mb-8 shadow-lg shadow-emerald-900/10">
-          <div className="absolute -right-10 -top-10 w-48 h-48 bg-white/10 rounded-full blur-2xl" />
-          <div className="absolute -right-4 bottom-0 w-32 h-32 bg-white/10 rounded-full blur-xl" />
-          <div className="relative flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-white/15 backdrop-blur-sm text-white p-3 rounded-2xl border border-white/20">
-                <Package size={26} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">Controle de Depósito</h1>
-                <p className="text-sm text-emerald-50/90">Defensivos agrícolas</p>
-              </div>
+    <div className="min-h-screen bg-slate-50/80 flex">
+      {/* ===== SIDEBAR ===== */}
+      <aside className="hidden md:flex flex-col w-72 bg-white border-r border-slate-200/80 shadow-sm sticky top-0 h-screen overflow-y-auto">
+        <div className="p-6 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-600 p-2.5 rounded-xl text-white shadow-md shadow-emerald-200">
+              <Package size={24} />
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={abrirHistorico}
-                className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm text-white hover:bg-white/25 border border-white/20 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all">
-                <History size={18} /> Histórico
-              </button>
-              <button onClick={abrirNovo}
-                className="flex items-center gap-1.5 bg-white text-emerald-700 hover:bg-emerald-50 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5">
-                <Plus size={18} /> Novo item
-              </button>
+            <div>
+              <h1 className="text-xl font-bold text-slate-800 tracking-tight">Estoque</h1>
+              <p className="text-xs text-slate-500">Defensivos agrícolas</p>
             </div>
           </div>
-        </header>
+        </div>
+        <nav className="flex-1 p-4 space-y-2">
+          <button
+            onClick={() => setFiltroAlerta("todos")}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${filtroAlerta === "todos" ? "bg-emerald-50 text-emerald-700 shadow-sm" : "text-slate-600 hover:bg-slate-50"}`}
+          >
+            <LayoutDashboard size={18} /> Todos os itens
+          </button>
+          <button
+            onClick={() => setFiltroAlerta(filtroAlerta === "vencidos" ? "todos" : "vencidos")}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${filtroAlerta === "vencidos" ? "bg-red-50 text-red-700 shadow-sm" : "text-slate-600 hover:bg-slate-50"}`}
+          >
+            <PackageX size={18} /> Vencidos <span className="ml-auto bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs">{alertas.vencidos}</span>
+          </button>
+          <button
+            onClick={() => setFiltroAlerta(filtroAlerta === "proximos" ? "todos" : "proximos")}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${filtroAlerta === "proximos" ? "bg-amber-50 text-amber-700 shadow-sm" : "text-slate-600 hover:bg-slate-50"}`}
+          >
+            <AlertTriangle size={18} /> Vencendo em 90d <span className="ml-auto bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{alertas.proximos}</span>
+          </button>
+          <button
+            onClick={() => setFiltroAlerta(filtroAlerta === "baixos" ? "todos" : "baixos")}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${filtroAlerta === "baixos" ? "bg-orange-50 text-orange-700 shadow-sm" : "text-slate-600 hover:bg-slate-50"}`}
+          >
+            <AlertOctagon size={18} /> Estoque baixo <span className="ml-auto bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs">{alertas.baixos}</span>
+          </button>
+          <hr className="my-4 border-slate-100" />
+          <button
+            onClick={abrirNovo}
+            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-md shadow-emerald-200 transition-all hover:shadow-lg"
+          >
+            <Plus size={18} /> Novo item
+          </button>
+          <button
+            onClick={abrirHistorico}
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all"
+          >
+            <History size={18} /> Histórico
+          </button>
+        </nav>
+        <div className="p-4 border-t border-slate-100 text-xs text-slate-400">
+          {itens.length} itens cadastrados
+        </div>
+      </aside>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <button onClick={() => setFiltroAlerta(filtroAlerta === "vencidos" ? "todos" : "vencidos")}
-            className={`group flex items-center gap-4 p-5 rounded-2xl border text-left bg-white transition-all hover:shadow-lg hover:-translate-y-0.5 ${alertas.vencidos > 0 ? "border-red-100 shadow-sm shadow-red-100" : "border-slate-100"} ${filtroAlerta === "vencidos" ? "ring-2 ring-red-400" : ""}`}>
-            <div className={`p-3 rounded-xl ${alertas.vencidos > 0 ? "bg-red-50" : "bg-slate-50"}`}>
-              <PackageX className={alertas.vencidos > 0 ? "text-red-600" : "text-slate-300"} size={22} />
-            </div>
-            <div><p className="text-2xl font-bold text-slate-800">{alertas.vencidos}</p><p className="text-xs text-slate-500 font-medium">Produtos vencidos</p></div>
-          </button>
-          <button onClick={() => setFiltroAlerta(filtroAlerta === "proximos" ? "todos" : "proximos")}
-            className={`group flex items-center gap-4 p-5 rounded-2xl border text-left bg-white transition-all hover:shadow-lg hover:-translate-y-0.5 ${alertas.proximos > 0 ? "border-amber-100 shadow-sm shadow-amber-100" : "border-slate-100"} ${filtroAlerta === "proximos" ? "ring-2 ring-amber-400" : ""}`}>
-            <div className={`p-3 rounded-xl ${alertas.proximos > 0 ? "bg-amber-50" : "bg-slate-50"}`}>
-              <AlertTriangle className={alertas.proximos > 0 ? "text-amber-600" : "text-slate-300"} size={22} />
-            </div>
-            <div><p className="text-2xl font-bold text-slate-800">{alertas.proximos}</p><p className="text-xs text-slate-500 font-medium">Vencendo em {DIAS_ALERTA_VENCIMENTO} dias</p></div>
-          </button>
-          <button onClick={() => setFiltroAlerta(filtroAlerta === "baixos" ? "todos" : "baixos")}
-            className={`group flex items-center gap-4 p-5 rounded-2xl border text-left bg-white transition-all hover:shadow-lg hover:-translate-y-0.5 ${alertas.baixos > 0 ? "border-orange-100 shadow-sm shadow-orange-100" : "border-slate-100"} ${filtroAlerta === "baixos" ? "ring-2 ring-orange-400" : ""}`}>
-            <div className={`p-3 rounded-xl ${alertas.baixos > 0 ? "bg-orange-50" : "bg-slate-50"}`}>
-              <AlertOctagon className={alertas.baixos > 0 ? "text-orange-600" : "text-slate-300"} size={22} />
-            </div>
-            <div><p className="text-2xl font-bold text-slate-800">{alertas.baixos}</p><p className="text-xs text-slate-500 font-medium">Estoque baixo</p></div>
-          </button>
+      {/* ===== CONTEÚDO PRINCIPAL ===== */}
+      <main className="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full">
+        {/* Cabeçalho mobile (visível apenas em telas pequenas) */}
+        <div className="md:hidden flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <div className="bg-emerald-600 p-2 rounded-lg text-white"><Package size={20} /></div>
+            <div><h1 className="text-lg font-bold text-slate-800">Estoque</h1><p className="text-xs text-slate-500">Defensivos</p></div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={abrirNovo} className="bg-emerald-600 p-2 rounded-xl text-white shadow-md"><Plus size={20} /></button>
+            <button onClick={abrirHistorico} className="bg-slate-100 p-2 rounded-xl text-slate-600"><History size={20} /></button>
+          </div>
         </div>
 
-        <div className="relative mb-5">
-          <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou lote..."
-            className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-shadow" />
+        {/* Mensagem de erro */}
+        {erro && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
+            <AlertTriangle size={16} /> {erro}
+          </div>
+        )}
+
+        {/* Barra de busca */}
+        <div className="relative mb-6">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome ou lote..."
+            className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-shadow"
+          />
         </div>
 
-        {erro && <div className="mb-5 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{erro}</div>}
+        {/* Cards de estatísticas (mobile) */}
+        <div className="grid grid-cols-3 gap-3 mb-6 md:hidden">
+          <StatCard label="Vencidos" count={alertas.vencidos} icon={<PackageX size={18} />} color="red" />
+          <StatCard label="Próximos" count={alertas.proximos} icon={<AlertTriangle size={18} />} color="amber" />
+          <StatCard label="Baixos" count={alertas.baixos} icon={<AlertOctagon size={18} />} color="orange" />
+        </div>
 
+        {/* Lista de produtos */}
         <div className="space-y-3">
           {carregando ? (
-            <div className="bg-white border border-slate-100 rounded-2xl p-10 text-center text-slate-400 text-sm">Carregando itens...</div>
+            <div className="bg-white border border-slate-100 rounded-2xl p-10 text-center text-slate-400 text-sm">Carregando...</div>
           ) : listaFiltrada.length === 0 ? (
-            <div className="bg-white border border-slate-100 rounded-2xl p-10 text-center text-slate-400 text-sm">{itens.length === 0 ? "Nenhum item cadastrado ainda." : "Nenhum item corresponde ao filtro."}</div>
+            <div className="bg-white border border-slate-100 rounded-2xl p-10 text-center text-slate-400 text-sm">
+              {itens.length === 0 ? "Nenhum item cadastrado. Clique em 'Novo item'." : "Nenhum item corresponde ao filtro."}
+            </div>
           ) : (
             listaFiltrada.map((it) => {
               const pct = it.minimo > 0 ? Math.min(100, Math.round((it.quantidade / (it.minimo * 2)) * 100)) : 100;
               return (
-                <div key={it.id} className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between gap-3">
+                <div key={it.id} className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <p className="font-semibold text-slate-800 truncate">{it.nome}</p>
-                        {it.vencido && <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-medium"><PackageX size={12}/> Vencido</span>}
-                        {it.proximoVencimento && <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium"><AlertTriangle size={12}/> Vence em {it.dias}d</span>}
-                        {it.estoqueBaixo && <span className="flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-medium"><AlertOctagon size={12}/> Estoque baixo</span>}
+                        <p className="font-semibold text-slate-800 text-base truncate">{it.nome}</p>
+                        {it.vencido && <Badge color="red" icon={<PackageX size={12} />}>Vencido</Badge>}
+                        {it.proximoVencimento && <Badge color="amber" icon={<AlertTriangle size={12} />}>Vence em {it.dias}d</Badge>}
+                        {it.estoqueBaixo && <Badge color="orange" icon={<AlertOctagon size={12} />}>Estoque baixo</Badge>}
                       </div>
-                      <p className="text-xs text-slate-500">Lote {it.lote} · Validade {formatarDataBR(it.validade)} · {it.quantidade} {it.unidade} (mín. {it.minimo} {it.unidade})</p>
+                      <div className="text-xs text-slate-500 space-y-1">
+                        <p>Lote {it.lote} · Validade {formatarDataBR(it.validade)}</p>
+                        <p>
+                          <span className="font-medium text-slate-700">{it.quantidade} {it.unidade}</span>
+                          <span className="mx-1">·</span>
+                          mínimo {it.minimo} {it.unidade}
+                        </p>
+                      </div>
                       <div className="mt-2.5 h-1.5 w-full max-w-xs bg-slate-100 rounded-full overflow-hidden">
                         <div className={`h-full rounded-full transition-all ${corProgresso(pct)}`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => abrirRetirar(it)} className="p-2.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-colors" title="Dar baixa / retirar"><PackageMinus size={16} /></button>
-                      <button onClick={() => abrirEdicao(it)} className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors" title="Editar"><Pencil size={16} /></button>
-                      <button onClick={() => excluir(it.id)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors" title="Excluir"><Trash2 size={16} /></button>
+                      <button onClick={() => abrirRetirar(it)} className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-colors" title="Retirar"><PackageMinus size={18} /></button>
+                      <button onClick={() => abrirEdicao(it)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors" title="Editar"><Pencil size={18} /></button>
+                      <button onClick={() => excluir(it.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors" title="Excluir"><Trash2 size={18} /></button>
                     </div>
                   </div>
                 </div>
@@ -287,12 +339,13 @@ export default function App() {
             })
           )}
         </div>
-      </div>
+      </main>
 
+      {/* ===== MODAL DE FORMULÁRIO ===== */}
       {mostrarForm && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-br from-emerald-600 to-teal-700">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-br from-emerald-600 to-teal-700">
               <h2 className="font-semibold text-white text-lg">{editandoId ? "Editar item" : "Novo item"}</h2>
               <button onClick={fecharForm} className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-colors"><X size={20} /></button>
             </div>
@@ -344,6 +397,103 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ===== MODAL DE RETIRADA ===== */}
+      {mostrarRetirar && itemRetirar && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-4 bg-gradient-to-br from-teal-600 to-cyan-700">
+              <h2 className="font-semibold text-white">Retirar do estoque</h2>
+              <p className="text-sm text-teal-50/80">{itemRetirar.nome} · {itemRetirar.quantidade} {itemRetirar.unidade} disponível</p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-slate-600">Quantidade a retirar *</label>
+                <input type="number" step="any" min="0" value={qtdRetirar} onChange={(e) => setQtdRetirar(e.target.value)}
+                  className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" placeholder="Ex: 5" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600">Motivo (opcional)</label>
+                <input value={motivoRetirar} onChange={(e) => setMotivoRetirar(e.target.value)}
+                  className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" placeholder="Ex: Uso em campo" />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={fecharRetirar} className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50">Cancelar</button>
+                <button onClick={confirmarRetirada} disabled={salvando}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium disabled:opacity-60">
+                  <Check size={16} /> {salvando ? "Processando..." : "Confirmar retirada"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL DE HISTÓRICO ===== */}
+      {mostrarHistorico && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-br from-slate-700 to-slate-800">
+              <h2 className="font-semibold text-white flex items-center gap-2"><History size={20} /> Histórico de movimentações</h2>
+              <button onClick={() => setMostrarHistorico(false)} className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-colors"><X size={20} /></button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {carregandoHistorico ? (
+                <p className="text-center text-slate-400 text-sm py-6">Carregando...</p>
+              ) : historico.length === 0 ? (
+                <p className="text-center text-slate-400 text-sm py-6">Nenhuma movimentação registrada.</p>
+              ) : (
+                <div className="space-y-2">
+                  {historico.map((mov) => (
+                    <div key={mov.id} className="flex items-center justify-between border-b border-slate-100 py-2 text-sm">
+                      <div>
+                        <p className="font-medium text-slate-700">{mov.item_nome}</p>
+                        <p className="text-xs text-slate-400">{formatarDataHoraBR(mov.criado_em)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-mono text-sm text-teal-600">-{mov.quantidade} {mov.unidade}</p>
+                        {mov.motivo && <p className="text-xs text-slate-400">{mov.motivo}</p>}
+                      </div>
+                    </div>
+                  ))}
+                  {historico.length === 50 && <p className="text-xs text-slate-400 text-center pt-2">Mostrando as últimas 50 movimentações.</p>}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Componentes auxiliares ----
+function Badge({ color, icon, children }) {
+  const colors = {
+    red: "bg-red-100 text-red-700",
+    amber: "bg-amber-100 text-amber-700",
+    orange: "bg-orange-100 text-orange-700",
+    green: "bg-green-100 text-green-700",
+    slate: "bg-slate-100 text-slate-700",
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${colors[color] || colors.slate}`}>
+      {icon} {children}
+    </span>
+  );
+}
+
+function StatCard({ label, count, icon, color }) {
+  const colors = {
+    red: "bg-red-50 border-red-100 text-red-700",
+    amber: "bg-amber-50 border-amber-100 text-amber-700",
+    orange: "bg-orange-50 border-orange-100 text-orange-700",
+  };
+  return (
+    <div className={`flex flex-col items-center justify-center p-3 rounded-xl border ${colors[color]}`}>
+      {icon}
+      <span className="text-lg font-bold">{count}</span>
+      <span className="text-[10px] font-medium uppercase tracking-wide">{label}</span>
     </div>
   );
 }
