@@ -13,17 +13,23 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
 
   async function carregarCategorias() {
     try {
+      console.log("Buscando permissões para usuário:", sessao.user.id);
       const { data, error } = await supabase
         .from('user_categoria_permissao')
         .select('categoria_id, categorias(*)')
         .eq('user_id', sessao.user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro na consulta:", error);
+        setErro("Erro ao carregar permissões: " + error.message);
+        return;
+      }
+      console.log("Dados recebidos:", data);
       const cats = data.map(item => item.categorias).filter(c => c !== null);
       setCategorias(cats);
     } catch (err) {
-      console.error(err);
-      setErro("Erro ao carregar permissões.");
+      console.error("Erro inesperado:", err);
+      setErro("Erro ao carregar permissões: " + err.message);
     } finally {
       setCarregando(false);
     }
@@ -35,6 +41,24 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
 
   if (carregando) {
     return <div className="min-h-screen flex items-center justify-center bg-amber-50">Carregando...</div>;
+  }
+
+  if (erro) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-amber-50 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md text-center">
+          <h2 className="text-xl font-bold text-red-600 mb-2">Erro</h2>
+          <p className="text-gray-600">{erro}</p>
+          <p className="text-sm text-gray-500 mt-2">Verifique se você tem permissões cadastradas no banco de dados.</p>
+          <button
+            onClick={carregarCategorias}
+            className="mt-4 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -68,12 +92,6 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
           </div>
         </header>
 
-        {erro && (
-          <div className="mb-5 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
-            {erro}
-          </div>
-        )}
-
         {/* GRID DE SETORES */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {categorias.map((cat) => (
@@ -98,7 +116,8 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
 
         {categorias.length === 0 && (
           <div className="bg-white rounded-2xl p-10 text-center text-gray-500">
-            <p>Você não tem permissão para acessar nenhum setor.</p>
+            <p>Nenhuma permissão encontrada para este usuário.</p>
+            <p className="text-sm text-gray-400 mt-2">Entre em contato com o administrador.</p>
           </div>
         )}
       </div>
