@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   AlertTriangle, AlertOctagon, PackageX, PackageMinus,
   ArrowLeftRight, Plus, Trash2, Pencil, X, Check,
-  Package, Search, History, MapPin, Sprout, Tractor, LogOut,
-  Layers, Home, ChevronLeft
+  Package, Search, History, MapPin, Sprout, Tractor, LogOut
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Auth from "./Auth";
@@ -45,9 +44,6 @@ const vazio = {
   local: LOCAIS[2],
 };
 
-// ================================================================
-// FUNÇÕES AUXILIARES
-// ================================================================
 function diasAte(dataStr) {
   if (!dataStr) return null;
   const [ano, mes, dia] = dataStr.split("-").map(Number);
@@ -88,25 +84,16 @@ function getStatusInfo(item) {
   return { label: "OK", class: "bg-green-100 text-green-700 border-green-300" };
 }
 
-// ================================================================
-// COMPONENTE PRINCIPAL
-// ================================================================
 export default function App() {
   // ===== SESSÃO E AUTENTICAÇÃO =====
   const [sessao, setSessao] = useState(null);
   const [carregandoSessao, setCarregandoSessao] = useState(true);
 
-  // ===== NAVEGAÇÃO =====
-  const [tela, setTela] = useState('dashboard'); // 'dashboard' ou 'setor'
-  const [categoriaAtiva, setCategoriaAtiva] = useState(null);
-  const [categoriasPermitidas, setCategoriasPermitidas] = useState([]);
-  const [carregandoCategorias, setCarregandoCategorias] = useState(false);
-
-  // ===== DADOS DO SETOR ATIVO =====
+  // ===== DADOS =====
   const [itens, setItens] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [estoqueTotal, setEstoqueTotal] = useState([]);
-  const [estoquePorLocal, setEstoquePorLocal] = useState([]);
+  const [estoquePorLocal, setEstoquePorLocal] = useState([]); // para exibir no formulário
   const [totalProduto, setTotalProduto] = useState(0);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -141,9 +128,7 @@ export default function App() {
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   const [filtroHistorico, setFiltroHistorico] = useState('todos');
 
-  // ================================================================
-  // 1. SESSÃO E CARREGAMENTO DE CATEGORIAS PERMITIDAS
-  // ================================================================
+  // ===== EFETTO DE SESSÃO =====
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSessao(session);
@@ -157,149 +142,92 @@ export default function App() {
     return () => listener?.subscription?.unsubscribe();
   }, []);
 
-  // Carregar categorias permitidas quando o usuário logar
+  // ===== CARREGAR DADOS =====
   useEffect(() => {
     if (sessao) {
-      carregarCategoriasPermitidas();
+      carregarProdutos();
+      carregarItens();
+      carregarEstoqueTotal();
     }
   }, [sessao]);
 
-  // Quando a categoria ativa mudar (na tela setor), recarregar os dados
+  // ===== CARREGAR QUANTIDADES POR LOCAL E TOTAL DO PRODUTO =====
   useEffect(() => {
-    if (categoriaAtiva && sessao && tela === 'setor') {
-      carregarProdutosPorCategoria(categoriaAtiva);
-      carregarItensPorCategoria(categoriaAtiva);
-      carregarEstoqueTotalPorCategoria(categoriaAtiva);
-    }
-  }, [categoriaAtiva, sessao, tela]);
-
-  // ================================================================
-  // 2. FUNÇÕES DE CARREGAMENTO
-  // ================================================================
-  async function carregarCategoriasPermitidas() {
-    setCarregandoCategorias(true);
-    try {
-      const { data, error } = await supabase
-        .from('user_categoria_permissao')
-        .select('categoria_id, categorias(*)')
-        .eq('user_id', sessao.user.id);
-
-      if (error) throw error;
-
-      const cats = data.map(item => item.categorias).filter(c => c !== null);
-      setCategoriasPermitidas(cats);
-    } catch (err) {
-      console.error("Erro ao carregar categorias:", err);
-      setErro("Erro ao carregar suas permissões.");
-    } finally {
-      setCarregandoCategorias(false);
-    }
-  }
-
-  async function carregarProdutosPorCategoria(categoria) {
-    if (!categoria) return;
-    const { data, error } = await supabase
-      .from("produtos")
-      .select("*")
-      .eq("categoria_id", categoria.id)
-      .order("nome", { ascending: true });
-    if (!error) setProdutos(data || []);
-  }
-
-  async function carregarItensPorCategoria(categoria) {
-    if (!categoria) return;
-    setCarregando(true);
-    const { data, error } = await supabase
-      .from("itens")
-      .select(`
-        *,
-        produtos!inner (categoria_id)
-      `)
-      .eq("produtos.categoria_id", categoria.id)
-      .order("validade", { ascending: true });
-
-    if (error) {
-      console.error("Erro ao carregar itens:", error);
-      setErro("Erro ao carregar itens.");
-      setItens([]);
-    } else {
-      setItens(data || []);
-    }
-    setCarregando(false);
-  }
-
-  async function carregarEstoqueTotalPorCategoria(categoria) {
-    if (!categoria) return;
-    const { data, error } = await supabase
-      .from("estoque_total_produto")
-      .select("*")
-      .eq("categoria", categoria.nome)
-      .order("nome", { ascending: true });
-    if (!error) setEstoqueTotal(data || []);
-  }
-
-  // ===== CARREGAR QUANTIDADES POR LOCAL PARA O FORMULÁRIO =====
-  useEffect(() => {
-    if (form.produto_id && categoriaAtiva) {
+    if (form.produto_id) {
       carregarQuantidadesProduto(form.produto_id);
     } else {
       setEstoquePorLocal([]);
       setTotalProduto(0);
     }
-  }, [form.produto_id, categoriaAtiva]);
+  }, [form.produto_id]);
 
   async function carregarQuantidadesProduto(produtoId) {
     if (!produtoId) return;
+    // Buscar quantidades por local
     const { data: localData, error: localError } = await supabase
       .from("estoque_por_local")
       .select("*")
       .eq("produto_id", produtoId);
-    if (!localError) setEstoquePorLocal(localData || []);
+    if (!localError) {
+      setEstoquePorLocal(localData || []);
+    }
 
+    // Buscar total geral
     const { data: totalData, error: totalError } = await supabase
       .from("estoque_total_produto")
       .select("quantidade_total")
       .eq("produto_id", produtoId)
       .maybeSingle();
-    if (!totalError && totalData) setTotalProduto(totalData.quantidade_total || 0);
-    else setTotalProduto(0);
+    if (!totalError && totalData) {
+      setTotalProduto(totalData.quantidade_total || 0);
+    } else {
+      setTotalProduto(0);
+    }
   }
 
-  // ================================================================
-  // 3. NAVEGAÇÃO
-  // ================================================================
-  function irParaSetor(categoria) {
-    setCategoriaAtiva(categoria);
-    setTela('setor');
-    // Resetar filtros
-    setBusca("");
-    setFiltroAlerta("todos");
-    setFiltroLocal("todos");
-    setErro("");
+  async function carregarProdutos() {
+    const { data, error } = await supabase
+      .from("produtos")
+      .select("*")
+      .order("nome", { ascending: true });
+    if (error) {
+      console.error("Erro ao carregar produtos:", error);
+    } else {
+      setProdutos(data || []);
+    }
   }
 
-  function voltarDashboard() {
-    setTela('dashboard');
-    setCategoriaAtiva(null);
-    setItens([]);
-    setProdutos([]);
-    setEstoqueTotal([]);
+  async function carregarItens() {
+    setCarregando(true);
+    const { data, error } = await supabase
+      .from("itens")
+      .select("*")
+      .order("validade", { ascending: true });
+    if (error) setErro("Erro ao carregar itens.");
+    else setItens(data || []);
+    setCarregando(false);
   }
 
-  // ================================================================
-  // 4. LOGOUT
-  // ================================================================
+  async function carregarEstoqueTotal() {
+    const { data, error } = await supabase
+      .from("estoque_total_produto")
+      .select("*")
+      .order("nome", { ascending: true });
+    if (!error) setEstoqueTotal(data || []);
+  }
+
+  // ===== LOGOUT =====
   async function handleLogout() {
     await supabase.auth.signOut();
   }
 
-  // ================================================================
-  // 5. FUNÇÕES DO FORMULÁRIO
-  // ================================================================
+  // ===== FUNÇÕES DO FORMULÁRIO =====
   function abrirNovo() {
     setForm({ ...vazio });
     setEditandoId(null);
     setMostrarForm(true);
+    setEstoquePorLocal([]);
+    setTotalProduto(0);
   }
 
   function abrirEdicao(item) {
@@ -315,6 +243,7 @@ export default function App() {
     });
     setEditandoId(item.id);
     setMostrarForm(true);
+    // As quantidades serão carregadas pelo useEffect de form.produto_id
   }
 
   function fecharForm() {
@@ -347,7 +276,7 @@ export default function App() {
       form.minimo === "" ||
       !form.local
     ) {
-      setErro("Preencha todos os campos obrigatórios.");
+      setErro("Preencha todos os campos obrigatórios (produto, lote, validade, quantidade, mínimo e local).");
       return;
     }
     setSalvando(true);
@@ -377,8 +306,8 @@ export default function App() {
     }
     if (error) setErro("Erro ao salvar.");
     else {
-      await carregarItensPorCategoria(categoriaAtiva);
-      await carregarEstoqueTotalPorCategoria(categoriaAtiva);
+      await carregarItens();
+      await carregarEstoqueTotal();
       fecharForm();
     }
     setSalvando(false);
@@ -389,14 +318,12 @@ export default function App() {
     const { error } = await supabase.from("itens").delete().eq("id", id);
     if (error) setErro("Erro ao excluir.");
     else {
-      await carregarItensPorCategoria(categoriaAtiva);
-      await carregarEstoqueTotalPorCategoria(categoriaAtiva);
+      await carregarItens();
+      await carregarEstoqueTotal();
     }
   }
 
-  // ================================================================
-  // 6. RETIRADA
-  // ================================================================
+  // ===== RETIRADA =====
   function abrirRetirar(item) {
     setItemRetirar(item);
     setQtdRetirar("");
@@ -462,15 +389,13 @@ export default function App() {
       created_by: sessao.user.id,
     });
 
-    await carregarItensPorCategoria(categoriaAtiva);
-    await carregarEstoqueTotalPorCategoria(categoriaAtiva);
+    await carregarItens();
+    await carregarEstoqueTotal();
     setSalvando(false);
     fecharRetirar();
   }
 
-  // ================================================================
-  // 7. TRANSFERÊNCIA
-  // ================================================================
+  // ===== TRANSFERÊNCIA =====
   function abrirTransferir(item) {
     setItemTransferir(item);
     setLocalDestino(LOCAIS.find((l) => l !== item.local) || "");
@@ -478,9 +403,8 @@ export default function App() {
     setMotivoTransferir("");
     setErro("");
     setMostrarTransferir(true);
-    if (item.produto_id) {
-      carregarEstoquePorProduto(item.produto_id);
-    }
+    // Carregar estoque por local para este produto (para exibir no modal)
+    carregarEstoquePorProduto(item.produto_id);
   }
 
   async function carregarEstoquePorProduto(produtoId) {
@@ -519,6 +443,7 @@ export default function App() {
     setSalvando(true);
     setErro("");
 
+    // Subtrair da origem
     const { error: erroOrigem } = await supabase
       .from("itens")
       .update({
@@ -533,6 +458,7 @@ export default function App() {
       return;
     }
 
+    // Verificar se já existe item no destino (mesmo nome, lote e local)
     const { data: existente } = await supabase
       .from("itens")
       .select("*")
@@ -543,6 +469,7 @@ export default function App() {
 
     let erroDestino = null;
     if (existente) {
+      // Atualizar quantidade no destino
       const r = await supabase
         .from("itens")
         .update({
@@ -552,6 +479,7 @@ export default function App() {
         .eq("id", existente.id);
       erroDestino = r.error;
     } else {
+      // Criar novo item no destino (com produto_id)
       const r = await supabase.from("itens").insert({
         produto_id: itemTransferir.produto_id,
         nome: itemTransferir.nome,
@@ -573,6 +501,7 @@ export default function App() {
       return;
     }
 
+    // Registrar movimentação
     await supabase.from("movimentacoes").insert({
       item_id: itemTransferir.id,
       item_nome: itemTransferir.nome,
@@ -586,15 +515,13 @@ export default function App() {
       produto_id: itemTransferir.produto_id,
     });
 
-    await carregarItensPorCategoria(categoriaAtiva);
-    await carregarEstoqueTotalPorCategoria(categoriaAtiva);
+    await carregarItens();
+    await carregarEstoqueTotal();
     setSalvando(false);
     fecharTransferir();
   }
 
-  // ================================================================
-  // 8. HISTÓRICO
-  // ================================================================
+  // ===== HISTÓRICO =====
   async function abrirHistorico(filtro = 'todos') {
     setMostrarHistorico(true);
     setCarregandoHistorico(true);
@@ -603,12 +530,8 @@ export default function App() {
       .from("movimentacoes")
       .select(`
         *,
-        profiles!created_by (nome),
-        itens!inner (
-          produtos!inner (categoria_id)
-        )
+        profiles!created_by (nome)
       `)
-      .eq("itens.produtos.categoria_id", categoriaAtiva.id)
       .order("criado_em", { ascending: false })
       .limit(50);
 
@@ -621,9 +544,7 @@ export default function App() {
     setCarregandoHistorico(false);
   }
 
-  // ================================================================
-  // 9. CÁLCULOS E FILTROS (para a tela do setor)
-  // ================================================================
+  // ===== CÁLCULOS =====
   const itensComStatus = useMemo(
     () =>
       itens.map((it) => {
@@ -660,10 +581,8 @@ export default function App() {
     return [...lista].sort((a, b) => a.nome.localeCompare(b.nome));
   }, [itensComStatus, filtroAlerta, filtroLocal, busca]);
 
-  // ================================================================
-  // 10. RENDER
-  // ================================================================
-  if (carregandoSessao || carregandoCategorias) {
+  // ===== RENDER =====
+  if (carregandoSessao) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-amber-50">
         <p className="text-gray-600">Carregando...</p>
@@ -675,99 +594,27 @@ export default function App() {
     return <Auth onLogin={() => {}} />;
   }
 
-  // ===== DASHBOARD =====
-  if (tela === 'dashboard') {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-green-50 p-4 sm:p-8">
-        <div className="max-w-7xl mx-auto">
-          {/* HEADER */}
-          <header className="relative overflow-hidden bg-gradient-to-r from-green-800 to-green-700 rounded-2xl p-5 sm:p-7 mb-8 shadow-xl shadow-green-900/30 border border-green-600/30">
-            <div className="absolute -right-10 -top-10 w-48 h-48 bg-yellow-500/10 rounded-full blur-2xl" />
-            <div className="absolute -left-10 bottom-0 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl" />
-            <div className="relative flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-white/10 backdrop-blur-sm text-white p-3 rounded-2xl border border-white/20">
-                  <Package size={28} />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                    Depósito Agrícola
-                    <Tractor size={20} className="text-amber-300" />
-                  </h1>
-                  <p className="text-sm text-green-100">Sistema de Gestão de Estoque</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1.5 bg-red-500/20 text-white hover:bg-red-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
-                >
-                  <LogOut size={18} /> Sair
-                </button>
-              </div>
-            </div>
-          </header>
-
-          {/* GRID DE SETORES (CATEGORIAS) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {categoriasPermitidas.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => irParaSetor(cat)}
-                className="bg-white rounded-2xl border-2 border-gray-200 shadow-md hover:shadow-xl hover:border-green-400 transition-all p-6 text-left group hover:-translate-y-1"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-3 bg-green-100 rounded-xl group-hover:bg-green-200 transition-colors">
-                    <Layers size={24} className="text-green-700" />
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-800">{cat.nome}</h3>
-                </div>
-                <p className="text-sm text-gray-500">{cat.descricao || "Gerenciar estoque"}</p>
-                <div className="mt-3 text-xs text-green-600 font-medium flex items-center gap-1">
-                  Acessar <ChevronLeft size={14} className="rotate-180" />
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {categoriasPermitidas.length === 0 && (
-            <div className="bg-white rounded-2xl p-10 text-center text-gray-500">
-              <p>Você não tem permissão para acessar nenhum setor.</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ================================================================
-  // TELA DO SETOR (CATEGORIA)
-  // ================================================================
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-green-50 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* HEADER DO SETOR */}
-        <header className="relative overflow-hidden bg-gradient-to-r from-green-800 to-green-700 rounded-2xl p-5 sm:p-7 mb-6 shadow-xl shadow-green-900/30 border border-green-600/30">
+        {/* HEADER */}
+        <header className="relative overflow-hidden bg-gradient-to-r from-green-800 to-green-700 rounded-2xl p-5 sm:p-7 mb-8 shadow-xl shadow-green-900/30 border border-green-600/30">
           <div className="absolute -right-10 -top-10 w-48 h-48 bg-yellow-500/10 rounded-full blur-2xl" />
           <div className="absolute -left-10 bottom-0 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl" />
           <div className="relative flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
-              <button
-                onClick={voltarDashboard}
-                className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl transition-colors border border-white/20"
-                title="Voltar ao Dashboard"
-              >
-                <ChevronLeft size={24} />
-              </button>
+              <div className="bg-white/10 backdrop-blur-sm text-white p-3 rounded-2xl border border-white/20">
+                <Sprout size={28} />
+              </div>
               <div>
                 <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                  {categoriaAtiva?.nome}
-                  <Sprout size={20} className="text-amber-300" />
+                  Depósito Agrícola
+                  <Tractor size={20} className="text-amber-300" />
                 </h1>
-                <p className="text-sm text-green-100">Gestão de Estoque</p>
+                <p className="text-sm text-green-100">Defensivos e insumos</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => abrirHistorico(filtroHistorico)}
                 className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 border border-white/20 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all"
@@ -913,12 +760,10 @@ export default function App() {
           </div>
         )}
 
-        {/* RESUMO DE ESTOQUE TOTAL */}
+        {/* RESUMO DE ESTOQUE TOTAL POR PRODUTO */}
         {estoqueTotal.length > 0 && (
           <div className="mb-6 bg-white rounded-2xl border border-gray-200 shadow-md p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">
-              📦 Resumo de Estoque - {categoriaAtiva?.nome}
-            </h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">📦 Resumo de Estoque por Produto</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-60 overflow-y-auto">
               {estoqueTotal.slice(0, 20).map((item) => (
                 <div key={item.produto_id} className="flex justify-between items-center border-b border-gray-100 py-1 px-2 text-sm">
@@ -935,7 +780,7 @@ export default function App() {
           </div>
         )}
 
-        {/* LISTA DE ITENS */}
+        {/* LISTA DE ITENS EM GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {carregando ? (
             <div className="col-span-full bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400 text-sm">
@@ -944,7 +789,7 @@ export default function App() {
           ) : listaFiltrada.length === 0 ? (
             <div className="col-span-full bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400 text-sm">
               {itens.length === 0
-                ? `Nenhum item cadastrado na categoria ${categoriaAtiva?.nome}.`
+                ? "Nenhum item cadastrado ainda."
                 : "Nenhum item corresponde ao filtro."}
             </div>
           ) : (
@@ -1043,14 +888,13 @@ export default function App() {
         </div>
       </div>
 
-      {/* ===== MODAIS ===== */}
-      {/* MODAL - FORMULÁRIO */}
+      {/* ===== MODAL - FORMULÁRIO (com resumo de quantidades por local) ===== */}
       {mostrarForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
             <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-green-800 to-green-700">
               <h2 className="font-semibold text-white text-lg">
-                {editandoId ? "Editar item" : "Novo item"} - {categoriaAtiva?.nome}
+                {editandoId ? "Editar item" : "Novo item"}
               </h2>
               <button
                 onClick={fecharForm}
@@ -1060,8 +904,11 @@ export default function App() {
               </button>
             </div>
             <div className="px-6 py-6 space-y-5 max-h-[75vh] overflow-y-auto">
+              {/* SELETOR DE PRODUTO */}
               <div>
-                <label className="text-xs font-medium text-gray-600">Produto *</label>
+                <label className="text-xs font-medium text-gray-600">
+                  Produto *
+                </label>
                 <select
                   value={form.produto_id}
                   onChange={(e) => handleProdutoSelecionado(e.target.value)}
@@ -1076,9 +923,12 @@ export default function App() {
                 </select>
               </div>
 
+              {/* RESUMO DE QUANTIDADES POR LOCAL (quando produto selecionado) */}
               {form.produto_id && (
                 <div className="bg-green-50 rounded-xl p-3 border border-green-200">
-                  <p className="text-xs font-medium text-green-700 mb-1">📦 Quantidade atual por local:</p>
+                  <p className="text-xs font-medium text-green-700 mb-1">
+                    📦 Quantidade atual por local:
+                  </p>
                   <div className="grid grid-cols-2 gap-1 text-xs">
                     {estoquePorLocal.length > 0 ? (
                       estoquePorLocal.map((item) => (
@@ -1099,14 +949,18 @@ export default function App() {
               )}
 
               <div>
-                <label className="text-xs font-medium text-gray-600">Local de armazenamento *</label>
+                <label className="text-xs font-medium text-gray-600">
+                  Local de armazenamento *
+                </label>
                 <select
                   value={form.local}
                   onChange={(e) => setForm({ ...form, local: e.target.value })}
                   className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                 >
                   {LOCAIS.map((l) => (
-                    <option key={l} value={l}>{l}</option>
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1152,7 +1006,9 @@ export default function App() {
                     className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                   >
                     {UNIDADES.map((u) => (
-                      <option key={u} value={u}>{u}</option>
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -1195,9 +1051,305 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL - RETIRAR (mesmo código, omitido por brevidade) */}
-      {/* ... O código dos modais de retirar, transferir e histórico são os mesmos que você já tem, apenas com os nomes das categorias ajustados. Como o código é grande, vou manter a estrutura, mas você pode copiar os modais do código anterior. Caso precise, me avise. */}
+      {/* ===== MODAL - RETIRAR ===== */}
+      {mostrarRetirar && itemRetirar && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-teal-700 to-green-700">
+              <h2 className="font-semibold text-white text-lg flex items-center gap-2">
+                <PackageMinus size={20} /> Dar baixa no estoque
+              </h2>
+              <button
+                onClick={fecharRetirar}
+                className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="px-6 py-6 space-y-5">
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="font-medium text-gray-800">{itemRetirar.nome}</p>
+                <p className="text-xs text-gray-500">
+                  {itemRetirar.local} · Lote {itemRetirar.lote} · Disponível:{" "}
+                  {itemRetirar.quantidade} {itemRetirar.unidade}
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600">
+                  Quantidade a retirar *
+                </label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    max={itemRetirar.quantidade}
+                    value={qtdRetirar}
+                    onChange={(e) => setQtdRetirar(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition-shadow"
+                  />
+                  <span className="text-sm text-gray-500 shrink-0">{itemRetirar.unidade}</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600">
+                  Motivo da saída *
+                </label>
+                <select
+                  value={motivoRetirar}
+                  onChange={(e) => {
+                    setMotivoRetirar(e.target.value);
+                    if (e.target.value !== "Outro") setMotivoPersonalizado("");
+                  }}
+                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+                >
+                  <option value="">Selecione um motivo...</option>
+                  {MOTIVOS_SAIDA.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              {motivoRetirar === "Outro" && (
+                <div>
+                  <label className="text-xs font-medium text-gray-600">
+                    Descreva o motivo *
+                  </label>
+                  <input
+                    value={motivoPersonalizado}
+                    onChange={(e) => setMotivoPersonalizado(e.target.value)}
+                    placeholder="Ex: Devolução ao fornecedor"
+                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition-shadow"
+                  />
+                </div>
+              )}
+              {erro && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">
+                  {erro}
+                </div>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={fecharRetirar}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarRetirada}
+                  disabled={salvando}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60"
+                >
+                  <Check size={16} /> {salvando ? "Salvando..." : "Confirmar baixa"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {/* ===== MODAL - TRANSFERIR ===== */}
+      {mostrarTransferir && itemTransferir && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-indigo-700 to-purple-700">
+              <h2 className="font-semibold text-white text-lg flex items-center gap-2">
+                <ArrowLeftRight size={20} /> Transferir entre locais
+              </h2>
+              <button
+                onClick={fecharTransferir}
+                className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="px-6 py-6 space-y-5">
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="font-medium text-gray-800">{itemTransferir.nome}</p>
+                <p className="text-xs text-gray-500">
+                  Lote {itemTransferir.lote} · Disponível:{" "}
+                  {itemTransferir.quantidade} {itemTransferir.unidade}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  De: <span className="font-medium text-gray-700">{itemTransferir.local}</span>
+                </p>
+              </div>
+
+              {/* EXIBIÇÃO DE QUANTIDADE POR LOCAL (na transferência) */}
+              {estoquePorLocal.length > 0 && (
+                <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+                  <p className="text-xs font-medium text-blue-700 mb-1">📦 Quantidade disponível por local:</p>
+                  <div className="grid grid-cols-2 gap-1 text-xs">
+                    {estoquePorLocal.map((item) => (
+                      <div key={item.local} className="flex justify-between">
+                        <span className="text-gray-600">{item.local}:</span>
+                        <span className="font-semibold text-blue-700">{item.quantidade_total}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-medium text-gray-600">
+                  Transferir para *
+                </label>
+                <select
+                  value={localDestino}
+                  onChange={(e) => setLocalDestino(e.target.value)}
+                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                >
+                  {LOCAIS.filter((l) => l !== itemTransferir.local).map((l) => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600">
+                  Quantidade a transferir *
+                </label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    max={itemTransferir.quantidade}
+                    value={qtdTransferir}
+                    onChange={(e) => setQtdTransferir(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-shadow"
+                  />
+                  <span className="text-sm text-gray-500 shrink-0">{itemTransferir.unidade}</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600">
+                  Observação (opcional)
+                </label>
+                <input
+                  value={motivoTransferir}
+                  onChange={(e) => setMotivoTransferir(e.target.value)}
+                  placeholder="Ex: Reposição de balcão"
+                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-shadow"
+                />
+              </div>
+              {erro && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">
+                  {erro}
+                </div>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={fecharTransferir}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarTransferencia}
+                  disabled={salvando}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60"
+                >
+                  <Check size={16} /> {salvando ? "Transferindo..." : "Confirmar transferência"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL - HISTÓRICO ===== */}
+      {mostrarHistorico && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[80vh] flex flex-col border border-white/20">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-green-800 to-green-700 shrink-0">
+              <h2 className="font-semibold text-white text-lg flex items-center gap-2">
+                <History size={20} /> Histórico de movimentações
+              </h2>
+              <button
+                onClick={() => setMostrarHistorico(false)}
+                className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto">
+              {/* Seletor de filtro */}
+              <div className="flex items-center gap-2 mb-3">
+                <label className="text-xs font-medium text-gray-600">Filtrar por:</label>
+                <select
+                  value={filtroHistorico}
+                  onChange={(e) => {
+                    setFiltroHistorico(e.target.value);
+                    abrirHistorico(e.target.value);
+                  }}
+                  className="px-3 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="saida">Saídas (Baixas)</option>
+                  <option value="transferencia">Transferências</option>
+                </select>
+              </div>
+
+              {carregandoHistorico ? (
+                <p className="text-sm text-gray-400 text-center py-8">Carregando...</p>
+              ) : historico.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">
+                  Nenhuma movimentação registrada ainda.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {historico.map((h) => (
+                    <div
+                      key={h.id}
+                      className="flex items-center justify-between gap-3 py-2.5 border-b border-gray-100 last:border-0"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">
+                          {h.item_nome}
+                        </p>
+                        <p className="text-xs text-gray-500 flex flex-wrap items-center gap-1">
+                          <span>{formatarDataHoraBR(h.criado_em)}</span>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              h.tipo === "transferencia"
+                                ? "bg-indigo-100 text-indigo-700"
+                                : "bg-teal-100 text-teal-700"
+                            }`}
+                          >
+                            {h.tipo === "transferencia" ? "Transferência" : "Saída"}
+                          </span>
+                          {h.tipo === "transferencia" ? (
+                            <span>
+                              {h.local_origem} → {h.local_destino}
+                            </span>
+                          ) : (
+                            <span>{h.local_origem || ""}</span>
+                          )}
+                          {h.motivo && <span className="text-gray-400">· {h.motivo}</span>}
+                          {h.profiles?.nome && (
+                            <span className="text-gray-400">· {h.profiles.nome}</span>
+                          )}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-sm font-semibold shrink-0 ${
+                          h.tipo === "transferencia"
+                            ? "text-indigo-700"
+                            : "text-teal-700"
+                        }`}
+                      >
+                        {h.tipo === "transferencia" ? "" : "-"}
+                        {h.quantidade} {h.unidade}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
