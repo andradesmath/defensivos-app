@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   AlertTriangle, AlertOctagon, PackageX, PackageMinus,
   ArrowLeftRight, Plus, Trash2, Pencil, X, Check,
@@ -10,7 +10,7 @@ import Auth from "./Auth";
 const DIAS_ALERTA_VENCIMENTO = 90;
 const UNIDADES = ["L", "mL", "kg", "g", "un"];
 
-// ===== LOCAIS (prateleiras) =====
+// ===== LOCAIS =====
 const LOCAIS = [
   "Casa de Adubo - Depósito",
   "Casa de Adubo - Balcão",
@@ -35,6 +35,7 @@ const MOTIVOS_SAIDA = [
 // ===== ESTADO INICIAL DO FORMULÁRIO =====
 const vazio = {
   produto_id: "",
+  codigo: "",
   nome: "",
   lote: "",
   validade: "",
@@ -85,7 +86,7 @@ function getStatusInfo(item) {
 }
 
 export default function App() {
-  // ===== SESSÃO E AUTENTICAÇÃO =====
+  // ===== SESSÃO =====
   const [sessao, setSessao] = useState(null);
   const [carregandoSessao, setCarregandoSessao] = useState(true);
 
@@ -100,6 +101,9 @@ export default function App() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(vazio);
+  const [buscaProduto, setBuscaProduto] = useState("");
+  const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+  const sugestoesRef = useRef(null);
 
   // ===== FILTROS =====
   const [busca, setBusca] = useState("");
@@ -122,6 +126,18 @@ export default function App() {
   const [mostrarHistorico, setMostrarHistorico] = useState(false);
   const [historico, setHistorico] = useState([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+
+  // ===== FILTRO DE PRODUTOS PARA SUGESTÕES =====
+  const produtosFiltrados = useMemo(() => {
+    if (!buscaProduto.trim()) return produtos.slice(0, 10);
+    const termo = buscaProduto.toLowerCase().trim();
+    return produtos
+      .filter(p =>
+        p.nome.toLowerCase().includes(termo) ||
+        p.codigo.toLowerCase().includes(termo)
+      )
+      .slice(0, 10);
+  }, [produtos, buscaProduto]);
 
   // ===== EFETTO DE SESSÃO =====
   useEffect(() => {
@@ -146,17 +162,14 @@ export default function App() {
   }, [sessao]);
 
   async function carregarProdutos() {
-    console.log("📦 Carregando produtos...");
     const { data, error } = await supabase
       .from("produtos")
       .select("*")
       .order("nome", { ascending: true });
-    
     if (error) {
-      console.error("❌ Erro ao carregar produtos:", error);
-      setErro("Erro ao carregar lista de produtos.");
+      console.error("Erro ao carregar produtos:", error);
     } else {
-      console.log(`✅ Produtos carregados: ${data?.length || 0}`);
+      console.log("Produtos carregados:", data?.length);
       setProdutos(data || []);
     }
   }
@@ -167,12 +180,8 @@ export default function App() {
       .from("itens")
       .select("*")
       .order("validade", { ascending: true });
-    if (error) {
-      console.error("❌ Erro ao carregar itens:", error);
-      setErro("Erro ao carregar itens.");
-    } else {
-      setItens(data || []);
-    }
+    if (error) setErro("Erro ao carregar itens.");
+    else setItens(data || []);
     setCarregando(false);
   }
 
@@ -185,12 +194,17 @@ export default function App() {
   function abrirNovo() {
     setForm({ ...vazio });
     setEditandoId(null);
+    setBuscaProduto("");
     setMostrarForm(true);
+    setMostrarSugestoes(false);
   }
 
   function abrirEdicao(item) {
+    // Buscar o código do produto
+    const produto = produtos.find(p => p.id === item.produto_id);
     setForm({
       produto_id: item.produto_id || "",
+      codigo: produto?.codigo || "",
       nome: item.nome,
       lote: item.lote,
       validade: item.validade,
@@ -199,27 +213,29 @@ export default function App() {
       minimo: String(item.minimo),
       local: item.local || LOCAIS[2],
     });
+    setBuscaProduto(produto ? `${produto.codigo} - ${produto.nome}` : item.nome);
     setEditandoId(item.id);
     setMostrarForm(true);
+    setMostrarSugestoes(false);
   }
 
   function fecharForm() {
     setMostrarForm(false);
     setForm(vazio);
     setEditandoId(null);
+    setBuscaProduto("");
+    setMostrarSugestoes(false);
   }
 
-  function handleProdutoSelecionado(produtoId) {
-    const produto = produtos.find(p => p.id === produtoId);
-    if (produto) {
-      setForm({
-        ...form,
-        produto_id: produto.id,
-        nome: produto.nome,
-      });
-    } else {
-      setForm({ ...form, produto_id: "", nome: "" });
-    }
+  function selecionarProduto(produto) {
+    setForm({
+      ...form,
+      produto_id: produto.id,
+      codigo: produto.codigo,
+      nome: produto.nome,
+    });
+    setBuscaProduto(`${produto.codigo} - ${produto.nome}`);
+    setMostrarSugestoes(false);
   }
 
   async function salvarForm() {
@@ -259,10 +275,8 @@ export default function App() {
       const { error: e } = await supabase.from("itens").insert(dados);
       error = e;
     }
-    if (error) {
-      console.error("❌ Erro ao salvar:", error);
-      setErro("Erro ao salvar.");
-    } else {
+    if (error) setErro("Erro ao salvar.");
+    else {
       await carregarItens();
       fecharForm();
     }
@@ -272,12 +286,8 @@ export default function App() {
   async function excluir(id) {
     if (!window.confirm("Excluir este item do depósito?")) return;
     const { error } = await supabase.from("itens").delete().eq("id", id);
-    if (error) {
-      console.error("❌ Erro ao excluir:", error);
-      setErro("Erro ao excluir.");
-    } else {
-      carregarItens();
-    }
+    if (error) setErro("Erro ao excluir.");
+    else carregarItens();
   }
 
   // ===== RETIRADA =====
@@ -329,7 +339,6 @@ export default function App() {
       .eq("id", itemRetirar.id);
 
     if (erroUpdate) {
-      console.error("❌ Erro ao atualizar estoque:", erroUpdate);
       setErro("Erro ao dar baixa no estoque.");
       setSalvando(false);
       return;
@@ -397,7 +406,6 @@ export default function App() {
       .eq("id", itemTransferir.id);
 
     if (erroOrigem) {
-      console.error("❌ Erro ao atualizar origem:", erroOrigem);
       setErro("Erro ao atualizar o local de origem.");
       setSalvando(false);
       return;
@@ -437,7 +445,6 @@ export default function App() {
     }
 
     if (erroDestino) {
-      console.error("❌ Erro ao criar/atualizar destino:", erroDestino);
       setErro("Erro ao criar/atualizar item no destino.");
       setSalvando(false);
       return;
@@ -512,6 +519,17 @@ export default function App() {
     }
     return [...lista].sort((a, b) => a.nome.localeCompare(b.nome));
   }, [itensComStatus, filtroAlerta, filtroLocal, busca]);
+
+  // ===== CLIQUE FORA DAS SUGESTÕES =====
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (sugestoesRef.current && !sugestoesRef.current.contains(event.target)) {
+        setMostrarSugestoes(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // ===== RENDER =====
   if (carregandoSessao) {
@@ -692,7 +710,7 @@ export default function App() {
           </div>
         )}
 
-        {/* LISTA DE ITENS EM GRID */}
+        {/* LISTA DE ITENS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {carregando ? (
             <div className="col-span-full bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400 text-sm">
@@ -800,7 +818,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* ===== MODAL - FORMULÁRIO (com seletor de produtos) ===== */}
+      {/* ===== MODAL - FORMULÁRIO ===== */}
       {mostrarForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -816,27 +834,56 @@ export default function App() {
               </button>
             </div>
             <div className="px-6 py-6 space-y-5 max-h-[75vh] overflow-y-auto">
-              {/* SELETOR DE PRODUTO */}
+              {/* CAMPO DE BUSCA DE PRODUTO COM AUTOCOMPLETE */}
               <div>
                 <label className="text-xs font-medium text-gray-600">
-                  Produto *
+                  Produto * (busque por nome ou código)
                 </label>
-                <select
-                  value={form.produto_id}
-                  onChange={(e) => handleProdutoSelecionado(e.target.value)}
-                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                >
-                  <option value="">Selecione um produto...</option>
-                  {produtos.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.codigo} - {p.nome}
-                    </option>
-                  ))}
-                </select>
-                {/* DEBUG: mostra quantos produtos estão carregados */}
-                <p className="text-xs text-gray-400 mt-1">
-                  {produtos.length} produtos carregados
-                </p>
+                <div className="relative" ref={sugestoesRef}>
+                  <input
+                    type="text"
+                    value={buscaProduto}
+                    onChange={(e) => {
+                      setBuscaProduto(e.target.value);
+                      setMostrarSugestoes(true);
+                      if (!e.target.value) {
+                        setForm({ ...form, produto_id: "", codigo: "", nome: "" });
+                      }
+                    }}
+                    onFocus={() => setMostrarSugestoes(true)}
+                    placeholder="Digite nome ou código..."
+                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-shadow"
+                  />
+                  {mostrarSugestoes && produtosFiltrados.length > 0 && (
+                    <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                      {produtosFiltrados.map((p) => (
+                        <li
+                          key={p.id}
+                          onClick={() => selecionarProduto(p)}
+                          className="px-3 py-2 hover:bg-green-50 cursor-pointer text-sm flex items-center gap-2 border-b border-gray-100 last:border-0"
+                        >
+                          <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
+                            {p.codigo}
+                          </span>
+                          <span className="text-gray-800">{p.nome}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {mostrarSugestoes && buscaProduto && produtosFiltrados.length === 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 text-sm text-gray-500">
+                      Nenhum produto encontrado.
+                    </div>
+                  )}
+                </div>
+                {/* Exibir código e nome selecionados */}
+                {form.produto_id && (
+                  <div className="mt-2 flex items-center gap-2 text-xs bg-gray-50 p-2 rounded-lg">
+                    <span className="font-mono text-gray-600">Código: <strong>{form.codigo}</strong></span>
+                    <span className="text-gray-400">|</span>
+                    <span className="text-gray-600">Nome: <strong>{form.nome}</strong></span>
+                  </div>
+                )}
               </div>
 
               <div>
