@@ -125,7 +125,7 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                  Depósito Agrícola
+                  Estoque - Porteira Agrocomercial
                   <Tractor size={20} className="text-amber-300" />
                 </h1>
                 <p className="text-sm text-green-100">Sistema de Gestão de Estoque</p>
