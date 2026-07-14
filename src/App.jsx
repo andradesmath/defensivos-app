@@ -9,8 +9,6 @@ import Auth from "./Auth";
 
 const DIAS_ALERTA_VENCIMENTO = 90;
 const UNIDADES = ["L", "mL", "kg", "g", "un"];
-
-// ===== LOCAIS (prateleiras) =====
 const LOCAIS = [
   "Casa de Adubo - Depósito",
   "Casa de Adubo - Balcão",
@@ -21,8 +19,6 @@ const LOCAIS = [
   "Piatã - Depósito",
   "Piatã - Balcão",
 ];
-
-// ===== MOTIVOS DE SAÍDA =====
 const MOTIVOS_SAIDA = [
   "Aplicação",
   "Perda por Deterioração",
@@ -32,7 +28,6 @@ const MOTIVOS_SAIDA = [
   "Outro"
 ];
 
-// ===== ESTADO INICIAL DO FORMULÁRIO =====
 const vazio = {
   produto_id: "",
   nome: "",
@@ -85,28 +80,23 @@ function getStatusInfo(item) {
 }
 
 export default function App() {
-  // ===== SESSÃO E AUTENTICAÇÃO =====
   const [sessao, setSessao] = useState(null);
   const [carregandoSessao, setCarregandoSessao] = useState(true);
 
-  // ===== DADOS =====
   const [itens, setItens] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
-  // ===== FORMULÁRIO =====
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(vazio);
 
-  // ===== FILTROS =====
   const [busca, setBusca] = useState("");
   const [filtroAlerta, setFiltroAlerta] = useState("todos");
   const [filtroLocal, setFiltroLocal] = useState("todos");
 
-  // ===== MODAIS =====
   const [mostrarRetirar, setMostrarRetirar] = useState(false);
   const [itemRetirar, setItemRetirar] = useState(null);
   const [qtdRetirar, setQtdRetirar] = useState("");
@@ -123,7 +113,6 @@ export default function App() {
   const [historico, setHistorico] = useState([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
 
-  // ===== EFETTO DE SESSÃO =====
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSessao(session);
@@ -137,7 +126,6 @@ export default function App() {
     return () => listener?.subscription?.unsubscribe();
   }, []);
 
-  // ===== CARREGAR PRODUTOS E ITENS =====
   useEffect(() => {
     if (sessao) {
       carregarProdutos();
@@ -153,6 +141,7 @@ export default function App() {
     if (error) {
       console.error("Erro ao carregar produtos:", error);
     } else {
+      console.log("Produtos carregados:", data?.length);
       setProdutos(data || []);
     }
   }
@@ -168,12 +157,10 @@ export default function App() {
     setCarregando(false);
   }
 
-  // ===== LOGOUT =====
   async function handleLogout() {
     await supabase.auth.signOut();
   }
 
-  // ===== FUNÇÕES DO FORMULÁRIO =====
   function abrirNovo() {
     setForm({ ...vazio });
     setEditandoId(null);
@@ -266,7 +253,6 @@ export default function App() {
     else carregarItens();
   }
 
-  // ===== RETIRADA =====
   function abrirRetirar(item) {
     setItemRetirar(item);
     setQtdRetirar("");
@@ -337,7 +323,6 @@ export default function App() {
     fecharRetirar();
   }
 
-  // ===== TRANSFERÊNCIA =====
   function abrirTransferir(item) {
     setItemTransferir(item);
     setLocalDestino(LOCAIS.find((l) => l !== item.local) || "");
@@ -443,7 +428,6 @@ export default function App() {
     fecharTransferir();
   }
 
-  // ===== HISTÓRICO =====
   async function abrirHistorico() {
     setMostrarHistorico(true);
     setCarregandoHistorico(true);
@@ -459,7 +443,6 @@ export default function App() {
     setCarregandoHistorico(false);
   }
 
-  // ===== CÁLCULOS =====
   const itensComStatus = useMemo(
     () =>
       itens.map((it) => {
@@ -496,7 +479,6 @@ export default function App() {
     return [...lista].sort((a, b) => a.nome.localeCompare(b.nome));
   }, [itensComStatus, filtroAlerta, filtroLocal, busca]);
 
-  // ===== RENDER =====
   if (carregandoSessao) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-amber-50">
@@ -512,7 +494,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-green-50 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* HEADER */}
         <header className="relative overflow-hidden bg-gradient-to-r from-green-800 to-green-700 rounded-2xl p-5 sm:p-7 mb-8 shadow-xl shadow-green-900/30 border border-green-600/30">
           <div className="absolute -right-10 -top-10 w-48 h-48 bg-yellow-500/10 rounded-full blur-2xl" />
           <div className="absolute -left-10 bottom-0 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl" />
@@ -552,7 +533,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* CARDS DE ALERTA */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <button
             onClick={() =>
@@ -635,7 +615,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* BUSCA E FILTRO */}
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <Search
@@ -675,7 +654,6 @@ export default function App() {
           </div>
         )}
 
-        {/* LISTA DE ITENS EM GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {carregando ? (
             <div className="col-span-full bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400 text-sm">
@@ -783,7 +761,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* ===== MODAL - FORMULÁRIO (com seletor de produtos) ===== */}
+      {/* MODAL - FORMULÁRIO */}
       {mostrarForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -799,7 +777,6 @@ export default function App() {
               </button>
             </div>
             <div className="px-6 py-6 space-y-5 max-h-[75vh] overflow-y-auto">
-              {/* SELETOR DE PRODUTO */}
               <div>
                 <label className="text-xs font-medium text-gray-600">
                   Produto *
@@ -921,7 +898,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ===== MODAL - RETIRAR (com motivos) ===== */}
+      {/* MODAL - RETIRAR */}
       {mostrarRetirar && itemRetirar && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -1017,7 +994,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ===== MODAL - TRANSFERIR ===== */}
+      {/* MODAL - TRANSFERIR */}
       {mostrarTransferir && itemTransferir && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -1112,7 +1089,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ===== MODAL - HISTÓRICO ===== */}
+      {/* MODAL - HISTÓRICO */}
       {mostrarHistorico && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[80vh] flex flex-col border border-white/20">
