@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   AlertTriangle, AlertOctagon, PackageX, PackageMinus,
   ArrowLeftRight, Plus, Trash2, Pencil, X, Check,
-  Package, Search, History, MapPin
+  Package, Search, History, MapPin, Sprout, Tractor
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
@@ -56,7 +56,14 @@ function formatarDataHoraBR(iso) {
 function corProgresso(pct) {
   if (pct <= 25) return "bg-red-500";
   if (pct <= 60) return "bg-amber-500";
-  return "bg-emerald-500";
+  return "bg-green-600";
+}
+
+function getStatusInfo(item) {
+  if (item.vencido) return { label: "Vencido", class: "bg-red-100 text-red-700 border-red-300" };
+  if (item.proximoVencimento) return { label: `Vence em ${item.dias}d`, class: "bg-amber-100 text-amber-700 border-amber-300" };
+  if (item.estoqueBaixo) return { label: "Estoque baixo", class: "bg-orange-100 text-orange-700 border-orange-300" };
+  return { label: "OK", class: "bg-green-100 text-green-700 border-green-300" };
 }
 
 export default function App() {
@@ -373,38 +380,40 @@ export default function App() {
           i.nome.toLowerCase().includes(b) || i.lote.toLowerCase().includes(b)
       );
     }
-    return [...lista].sort((a, b) => (a.dias ?? 9999) - (b.dias ?? 9999));
+    // Ordenação alfabética por nome
+    return [...lista].sort((a, b) => a.nome.localeCompare(b.nome));
   }, [itensComStatus, filtroAlerta, filtroLocal, busca]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50 p-4 sm:p-8">
-      <div className="max-w-5xl mx-auto">
-        {/* HEADER - mais clean e com gradiente suave */}
-        <header className="relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-5 sm:p-7 mb-8 shadow-xl shadow-emerald-900/20">
-          <div className="absolute -right-10 -top-10 w-48 h-48 bg-white/5 rounded-full blur-2xl" />
-          <div className="absolute -right-4 bottom-0 w-32 h-32 bg-white/10 rounded-full blur-xl" />
+    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-green-50 p-4 sm:p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* HEADER AGRÍCOLA */}
+        <header className="relative overflow-hidden bg-gradient-to-r from-green-800 to-green-700 rounded-2xl p-5 sm:p-7 mb-8 shadow-xl shadow-green-900/30 border border-green-600/30">
+          <div className="absolute -right-10 -top-10 w-48 h-48 bg-yellow-500/10 rounded-full blur-2xl" />
+          <div className="absolute -left-10 bottom-0 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl" />
           <div className="relative flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
-              <div className="bg-white/15 backdrop-blur-sm text-white p-3 rounded-2xl border border-white/20">
-                <Package size={26} />
+              <div className="bg-white/10 backdrop-blur-sm text-white p-3 rounded-2xl border border-white/20">
+                <Sprout size={28} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">
-                  Controle de Depósito
+                <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                  Depósito Agrícola
+                  <Tractor size={20} className="text-amber-300" />
                 </h1>
-                <p className="text-sm text-emerald-50/90">Defensivos agrícolas</p>
+                <p className="text-sm text-green-100">Defensivos e insumos</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={abrirHistorico}
-                className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm text-white hover:bg-white/25 border border-white/20 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all"
+                className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 border border-white/20 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all"
               >
                 <History size={18} /> Histórico
               </button>
               <button
                 onClick={abrirNovo}
-                className="flex items-center gap-1.5 bg-white text-emerald-700 hover:bg-emerald-50 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5"
+                className="flex items-center gap-1.5 bg-amber-500 text-green-900 hover:bg-amber-400 px-4 py-2.5 rounded-xl text-sm font-bold shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5"
               >
                 <Plus size={18} /> Novo item
               </button>
@@ -412,7 +421,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* CARDS DE ALERTA - mais interativos */}
+        {/* CARDS DE ALERTA - Estilo agro */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <button
             onClick={() =>
@@ -420,8 +429,8 @@ export default function App() {
             }
             className={`group flex items-center gap-4 p-5 rounded-2xl border-2 bg-white transition-all hover:shadow-lg hover:scale-[1.02] ${
               alertas.vencidos > 0
-                ? "border-red-200 shadow-red-100/50"
-                : "border-slate-200"
+                ? "border-red-300 shadow-red-100/50"
+                : "border-gray-200"
             } ${
               filtroAlerta === "vencidos"
                 ? "ring-2 ring-red-400 ring-offset-2"
@@ -430,21 +439,21 @@ export default function App() {
           >
             <div
               className={`p-3 rounded-xl ${
-                alertas.vencidos > 0 ? "bg-red-50" : "bg-slate-50"
+                alertas.vencidos > 0 ? "bg-red-50" : "bg-gray-50"
               }`}
             >
               <PackageX
                 size={24}
                 className={
-                  alertas.vencidos > 0 ? "text-red-600" : "text-slate-300"
+                  alertas.vencidos > 0 ? "text-red-600" : "text-gray-300"
                 }
               />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-800">
+              <p className="text-2xl font-bold text-gray-800">
                 {alertas.vencidos}
               </p>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs text-gray-500 font-medium">
                 Produtos vencidos
               </p>
             </div>
@@ -456,8 +465,8 @@ export default function App() {
             }
             className={`group flex items-center gap-4 p-5 rounded-2xl border-2 bg-white transition-all hover:shadow-lg hover:scale-[1.02] ${
               alertas.proximos > 0
-                ? "border-amber-200 shadow-amber-100/50"
-                : "border-slate-200"
+                ? "border-amber-300 shadow-amber-100/50"
+                : "border-gray-200"
             } ${
               filtroAlerta === "proximos"
                 ? "ring-2 ring-amber-400 ring-offset-2"
@@ -466,21 +475,21 @@ export default function App() {
           >
             <div
               className={`p-3 rounded-xl ${
-                alertas.proximos > 0 ? "bg-amber-50" : "bg-slate-50"
+                alertas.proximos > 0 ? "bg-amber-50" : "bg-gray-50"
               }`}
             >
               <AlertTriangle
                 size={24}
                 className={
-                  alertas.proximos > 0 ? "text-amber-600" : "text-slate-300"
+                  alertas.proximos > 0 ? "text-amber-600" : "text-gray-300"
                 }
               />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-800">
+              <p className="text-2xl font-bold text-gray-800">
                 {alertas.proximos}
               </p>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs text-gray-500 font-medium">
                 Vencendo em {DIAS_ALERTA_VENCIMENTO} dias
               </p>
             </div>
@@ -492,8 +501,8 @@ export default function App() {
             }
             className={`group flex items-center gap-4 p-5 rounded-2xl border-2 bg-white transition-all hover:shadow-lg hover:scale-[1.02] ${
               alertas.baixos > 0
-                ? "border-orange-200 shadow-orange-100/50"
-                : "border-slate-200"
+                ? "border-orange-300 shadow-orange-100/50"
+                : "border-gray-200"
             } ${
               filtroAlerta === "baixos"
                 ? "ring-2 ring-orange-400 ring-offset-2"
@@ -502,21 +511,21 @@ export default function App() {
           >
             <div
               className={`p-3 rounded-xl ${
-                alertas.baixos > 0 ? "bg-orange-50" : "bg-slate-50"
+                alertas.baixos > 0 ? "bg-orange-50" : "bg-gray-50"
               }`}
             >
               <AlertOctagon
                 size={24}
                 className={
-                  alertas.baixos > 0 ? "text-orange-600" : "text-slate-300"
+                  alertas.baixos > 0 ? "text-orange-600" : "text-gray-300"
                 }
               />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-800">
+              <p className="text-2xl font-bold text-gray-800">
                 {alertas.baixos}
               </p>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs text-gray-500 font-medium">
                 Estoque baixo
               </p>
             </div>
@@ -528,24 +537,24 @@ export default function App() {
           <div className="relative flex-1">
             <Search
               size={17}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
             />
             <input
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar por nome ou lote..."
-              className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl text-sm bg-white shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-shadow"
+              className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-2xl text-sm bg-white shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-shadow"
             />
           </div>
           <div className="relative sm:w-64">
             <MapPin
               size={16}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
             />
             <select
               value={filtroLocal}
               onChange={(e) => setFiltroLocal(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 appearance-none"
+              className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-2xl text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-green-600 appearance-none"
             >
               <option value="todos">Todos os locais</option>
               {LOCAIS.map((l) => (
@@ -563,14 +572,14 @@ export default function App() {
           </div>
         )}
 
-        {/* LISTA DE ITENS */}
-        <div className="space-y-3">
+        {/* LISTA DE ITENS EM GRID RESPONSIVO */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {carregando ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-slate-400 text-sm">
+            <div className="col-span-full bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400 text-sm">
               Carregando itens...
             </div>
           ) : listaFiltrada.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-slate-400 text-sm">
+            <div className="col-span-full bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400 text-sm">
               {itens.length === 0
                 ? "Nenhum item cadastrado ainda."
                 : "Nenhum item corresponde ao filtro."}
@@ -581,88 +590,92 @@ export default function App() {
                 it.minimo > 0
                   ? Math.min(100, Math.round((it.quantidade / (it.minimo * 2)) * 100))
                   : 100;
-
-              // Define a cor da borda lateral conforme o status
-              let borderColor = "border-l-transparent";
-              if (it.vencido) borderColor = "border-l-red-500";
-              else if (it.proximoVencimento) borderColor = "border-l-amber-500";
-              else if (it.estoqueBaixo) borderColor = "border-l-orange-500";
+              const status = getStatusInfo(it);
 
               return (
                 <div
                   key={it.id}
-                  className={`bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-md hover:shadow-lg transition-all ${borderColor} border-l-4`}
+                  className="bg-white rounded-2xl border border-gray-200 shadow-md hover:shadow-lg transition-all overflow-hidden flex flex-col"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <p className="font-semibold text-slate-800 truncate">
-                          {it.nome}
-                        </p>
-                        <span className="flex items-center gap-1 text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">
-                          <MapPin size={12} /> {it.local}
-                        </span>
-                        {it.vencido && (
-                          <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-medium">
-                            <PackageX size={12} /> Vencido
-                          </span>
-                        )}
-                        {it.proximoVencimento && (
-                          <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium">
-                            <AlertTriangle size={12} /> Vence em {it.dias}d
-                          </span>
-                        )}
-                        {it.estoqueBaixo && (
-                          <span className="flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-medium">
-                            <AlertOctagon size={12} /> Estoque baixo
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        Lote {it.lote} · Validade {formatarDataBR(it.validade)} ·{" "}
-                        {it.quantidade} {it.unidade} (mín. {it.minimo}{" "}
-                        {it.unidade})
-                      </p>
-                      {/* Barra de progresso mais grossa */}
-                      <div className="mt-2 h-2 w-full max-w-xs bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${corProgresso(
-                            pct
-                          )}`}
-                          style={{ width: `${pct}%` }}
-                        />
+                  {/* Topo com nome e status */}
+                  <div className="p-4 pb-2 flex items-start justify-between gap-2 border-b border-gray-100">
+                    <div>
+                      <h3 className="font-bold text-gray-800 text-lg leading-tight">
+                        {it.nome}
+                      </h3>
+                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                        <MapPin size={12} />
+                        <span>{it.local}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
+                    <span
+                      className={`text-xs font-semibold px-2 py-1 rounded-full border ${status.class}`}
+                    >
+                      {status.label}
+                    </span>
+                  </div>
+
+                  {/* Conteúdo */}
+                  <div className="p-4 space-y-2 flex-1">
+                    <div className="grid grid-cols-2 gap-1 text-sm">
+                      <span className="text-gray-500">Lote:</span>
+                      <span className="font-medium text-gray-700 text-right">
+                        {it.lote}
+                      </span>
+                      <span className="text-gray-500">Validade:</span>
+                      <span className="font-medium text-gray-700 text-right">
+                        {formatarDataBR(it.validade)}
+                      </span>
+                      <span className="text-gray-500">Quantidade:</span>
+                      <span className="font-medium text-gray-700 text-right">
+                        {it.quantidade} {it.unidade}
+                      </span>
+                      <span className="text-gray-500">Mínimo:</span>
+                      <span className="font-medium text-gray-700 text-right">
+                        {it.minimo} {it.unidade}
+                      </span>
+                    </div>
+                    {/* Barra de progresso */}
+                    <div className="mt-1 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${corProgresso(pct)}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Ações */}
+                  <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+                    <div className="flex gap-1">
                       <button
                         onClick={() => abrirTransferir(it)}
-                        className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+                        className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                         title="Transferir"
                       >
                         <ArrowLeftRight size={16} />
                       </button>
                       <button
                         onClick={() => abrirRetirar(it)}
-                        className="p-2.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-colors"
-                        title="Dar baixa / retirar"
+                        className="p-2 text-gray-500 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                        title="Dar baixa"
                       >
                         <PackageMinus size={16} />
                       </button>
                       <button
                         onClick={() => abrirEdicao(it)}
-                        className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                        className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                         title="Editar"
                       >
                         <Pencil size={16} />
                       </button>
-                      <button
-                        onClick={() => excluir(it.id)}
-                        className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 size={16} />
-                      </button>
                     </div>
+                    <button
+                      onClick={() => excluir(it.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Excluir"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
               );
@@ -671,11 +684,13 @@ export default function App() {
         </div>
       </div>
 
-      {/* MODAL - FORMULÁRIO (Novo/Editar) */}
+      {/* MODAIS - mantidos com mesmo estilo refinado, apenas ajuste de cores agro */}
+
+      {/* MODAL - FORMULÁRIO */}
       {mostrarForm && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
-            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-700">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-green-800 to-green-700">
               <h2 className="font-semibold text-white text-lg">
                 {editandoId ? "Editar item" : "Novo item"}
               </h2>
@@ -688,24 +703,24 @@ export default function App() {
             </div>
             <div className="px-6 py-6 space-y-5 max-h-[75vh] overflow-y-auto">
               <div>
-                <label className="text-xs font-medium text-slate-600">
+                <label className="text-xs font-medium text-gray-600">
                   Nome do produto *
                 </label>
                 <input
                   value={form.nome}
                   onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                  className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-shadow"
+                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-shadow"
                   placeholder="Ex: Glifosato 480"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600">
+                <label className="text-xs font-medium text-gray-600">
                   Local de armazenamento *
                 </label>
                 <select
                   value={form.local}
                   onChange={(e) => setForm({ ...form, local: e.target.value })}
-                  className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                 >
                   {LOCAIS.map((l) => (
                     <option key={l} value={l}>
@@ -716,18 +731,18 @@ export default function App() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600">
+                  <label className="text-xs font-medium text-gray-600">
                     Lote *
                   </label>
                   <input
                     value={form.lote}
                     onChange={(e) => setForm({ ...form, lote: e.target.value })}
-                    className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-shadow"
+                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-shadow"
                     placeholder="Ex: L2024-08"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600">
+                  <label className="text-xs font-medium text-gray-600">
                     Validade *
                   </label>
                   <input
@@ -736,13 +751,13 @@ export default function App() {
                     onChange={(e) =>
                       setForm({ ...form, validade: e.target.value })
                     }
-                    className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600">
+                  <label className="text-xs font-medium text-gray-600">
                     Quantidade *
                   </label>
                   <input
@@ -753,11 +768,11 @@ export default function App() {
                     onChange={(e) =>
                       setForm({ ...form, quantidade: e.target.value })
                     }
-                    className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600">
+                  <label className="text-xs font-medium text-gray-600">
                     Unidade
                   </label>
                   <select
@@ -765,7 +780,7 @@ export default function App() {
                     onChange={(e) =>
                       setForm({ ...form, unidade: e.target.value })
                     }
-                    className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                   >
                     {UNIDADES.map((u) => (
                       <option key={u} value={u}>
@@ -775,7 +790,7 @@ export default function App() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600">
+                  <label className="text-xs font-medium text-gray-600">
                     Mínimo *
                   </label>
                   <input
@@ -786,7 +801,7 @@ export default function App() {
                     onChange={(e) =>
                       setForm({ ...form, minimo: e.target.value })
                     }
-                    className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                   />
                 </div>
               </div>
@@ -798,14 +813,14 @@ export default function App() {
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={fecharForm}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={salvarForm}
                   disabled={salvando}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60"
                 >
                   <Check size={16} />{" "}
                   {salvando ? "Salvando..." : "Salvar"}
@@ -816,11 +831,11 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL - RETIRAR / BAIXA */}
+      {/* MODAL - RETIRAR */}
       {mostrarRetirar && itemRetirar && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
-            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-teal-600 to-emerald-700">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-teal-700 to-green-700">
               <h2 className="font-semibold text-white text-lg flex items-center gap-2">
                 <PackageMinus size={20} /> Dar baixa no estoque
               </h2>
@@ -832,17 +847,17 @@ export default function App() {
               </button>
             </div>
             <div className="px-6 py-6 space-y-5">
-              <div className="bg-slate-50 rounded-xl p-3">
-                <p className="font-medium text-slate-800">
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="font-medium text-gray-800">
                   {itemRetirar.nome}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-gray-500">
                   {itemRetirar.local} · Lote {itemRetirar.lote} · Disponível:{" "}
                   {itemRetirar.quantidade} {itemRetirar.unidade}
                 </p>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600">
+                <label className="text-xs font-medium text-gray-600">
                   Quantidade a retirar *
                 </label>
                 <div className="flex items-center gap-2 mt-1">
@@ -853,22 +868,22 @@ export default function App() {
                     max={itemRetirar.quantidade}
                     value={qtdRetirar}
                     onChange={(e) => setQtdRetirar(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent transition-shadow"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition-shadow"
                   />
-                  <span className="text-sm text-slate-500 shrink-0">
+                  <span className="text-sm text-gray-500 shrink-0">
                     {itemRetirar.unidade}
                   </span>
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600">
+                <label className="text-xs font-medium text-gray-600">
                   Motivo / aplicação (opcional)
                 </label>
                 <input
                   value={motivoRetirar}
                   onChange={(e) => setMotivoRetirar(e.target.value)}
                   placeholder="Ex: Aplicação talhão 3"
-                  className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent transition-shadow"
+                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition-shadow"
                 />
               </div>
               {erro && (
@@ -879,7 +894,7 @@ export default function App() {
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={fecharRetirar}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -899,9 +914,9 @@ export default function App() {
 
       {/* MODAL - TRANSFERÊNCIA */}
       {mostrarTransferir && itemTransferir && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
-            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-indigo-600 to-violet-700">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-indigo-700 to-purple-700">
               <h2 className="font-semibold text-white text-lg flex items-center gap-2">
                 <ArrowLeftRight size={20} /> Transferir entre locais
               </h2>
@@ -913,29 +928,29 @@ export default function App() {
               </button>
             </div>
             <div className="px-6 py-6 space-y-5">
-              <div className="bg-slate-50 rounded-xl p-3">
-                <p className="font-medium text-slate-800">
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="font-medium text-gray-800">
                   {itemTransferir.nome}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-gray-500">
                   Lote {itemTransferir.lote} · Disponível:{" "}
                   {itemTransferir.quantidade} {itemTransferir.unidade}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   De:{" "}
-                  <span className="font-medium text-slate-700">
+                  <span className="font-medium text-gray-700">
                     {itemTransferir.local}
                   </span>
                 </p>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600">
+                <label className="text-xs font-medium text-gray-600">
                   Transferir para *
                 </label>
                 <select
                   value={localDestino}
                   onChange={(e) => setLocalDestino(e.target.value)}
-                  className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
                 >
                   {LOCAIS.filter((l) => l !== itemTransferir.local).map((l) => (
                     <option key={l} value={l}>
@@ -945,7 +960,7 @@ export default function App() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600">
+                <label className="text-xs font-medium text-gray-600">
                   Quantidade a transferir *
                 </label>
                 <div className="flex items-center gap-2 mt-1">
@@ -956,22 +971,22 @@ export default function App() {
                     max={itemTransferir.quantidade}
                     value={qtdTransferir}
                     onChange={(e) => setQtdTransferir(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-shadow"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-shadow"
                   />
-                  <span className="text-sm text-slate-500 shrink-0">
+                  <span className="text-sm text-gray-500 shrink-0">
                     {itemTransferir.unidade}
                   </span>
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600">
+                <label className="text-xs font-medium text-gray-600">
                   Observação (opcional)
                 </label>
                 <input
                   value={motivoTransferir}
                   onChange={(e) => setMotivoTransferir(e.target.value)}
                   placeholder="Ex: Reposição de balcão"
-                  className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-shadow"
+                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-shadow"
                 />
               </div>
               {erro && (
@@ -982,7 +997,7 @@ export default function App() {
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={fecharTransferir}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -1002,9 +1017,9 @@ export default function App() {
 
       {/* MODAL - HISTÓRICO */}
       {mostrarHistorico && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[80vh] flex flex-col border border-white/20">
-            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-700 shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-green-800 to-green-700 shrink-0">
               <h2 className="font-semibold text-white text-lg flex items-center gap-2">
                 <History size={20} /> Histórico de movimentações
               </h2>
@@ -1017,11 +1032,11 @@ export default function App() {
             </div>
             <div className="px-6 py-4 overflow-y-auto">
               {carregandoHistorico ? (
-                <p className="text-sm text-slate-400 text-center py-8">
+                <p className="text-sm text-gray-400 text-center py-8">
                   Carregando...
                 </p>
               ) : historico.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-8">
+                <p className="text-sm text-gray-400 text-center py-8">
                   Nenhuma movimentação registrada ainda.
                 </p>
               ) : (
@@ -1029,13 +1044,13 @@ export default function App() {
                   {historico.map((h) => (
                     <div
                       key={h.id}
-                      className="flex items-center justify-between gap-3 py-2.5 border-b border-slate-100 last:border-0"
+                      className="flex items-center justify-between gap-3 py-2.5 border-b border-gray-100 last:border-0"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">
+                        <p className="text-sm font-medium text-gray-800 truncate">
                           {h.item_nome}
                         </p>
-                        <p className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
+                        <p className="text-xs text-gray-500 flex flex-wrap items-center gap-1">
                           <span>{formatarDataHoraBR(h.criado_em)}</span>
                           <span
                             className={`text-xs px-2 py-0.5 rounded-full ${
