@@ -7,7 +7,7 @@ import Setor from "./Setor";
 export default function App() {
   const [sessao, setSessao] = useState(null);
   const [carregando, setCarregando] = useState(true);
-  const [tela, setTela] = useState('dashboard'); // 'dashboard' ou 'setor'
+  const [tela, setTela] = useState('dashboard');
   const [categoriaAtiva, setCategoriaAtiva] = useState(null);
 
   useEffect(() => {
@@ -33,13 +33,8 @@ export default function App() {
     setCategoriaAtiva(null);
   }
 
-  if (carregando) {
-    return <div className="min-h-screen flex items-center justify-center bg-amber-50">Carregando...</div>;
-  }
-
-  if (!sessao) {
-    return <Auth onLogin={() => {}} />;
-  }
+  if (carregando) return <div className="min-h-screen flex items-center justify-center bg-amber-50">Carregando...</div>;
+  if (!sessao) return <Auth onLogin={() => {}} />;
 
   if (tela === 'dashboard') {
     return <Dashboard sessao={sessao} onSelectCategoria={irParaSetor} />;
