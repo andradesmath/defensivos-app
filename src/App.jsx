@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import {
   AlertTriangle, AlertOctagon, PackageX, PackageMinus,
   ArrowLeftRight, Plus, Trash2, Pencil, X, Check,
-  Package, Search, History, MapPin, Sprout, Tractor, LogOut
+  Package, Search, History, MapPin, Sprout, Tractor, LogOut,
+  Layers, Home
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Auth from "./Auth";
@@ -10,7 +11,7 @@ import Auth from "./Auth";
 const DIAS_ALERTA_VENCIMENTO = 90;
 const UNIDADES = ["L", "mL", "kg", "g", "un"];
 
-// ===== LOCAIS (prateleiras) =====
+// ===== LOCAIS (prateleiras) – mesmo para todos os ambientes =====
 const LOCAIS = [
   "Casa de Adubo - Depósito",
   "Casa de Adubo - Balcão",
@@ -44,6 +45,7 @@ const vazio = {
   local: LOCAIS[2],
 };
 
+// ===== FUNÇÕES AUXILIARES =====
 function diasAte(dataStr) {
   if (!dataStr) return null;
   const [ano, mes, dia] = dataStr.split("-").map(Number);
@@ -89,11 +91,16 @@ export default function App() {
   const [sessao, setSessao] = useState(null);
   const [carregandoSessao, setCarregandoSessao] = useState(true);
 
+  // ===== CATEGORIAS E PERMISSÕES =====
+  const [categoriasPermitidas, setCategoriasPermitidas] = useState([]);
+  const [categoriaAtiva, setCategoriaAtiva] = useState(null);
+  const [carregandoCategorias, setCarregandoCategorias] = useState(false);
+
   // ===== DADOS =====
   const [itens, setItens] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [estoqueTotal, setEstoqueTotal] = useState([]);
-  const [estoquePorLocal, setEstoquePorLocal] = useState([]); // para exibir no formulário
+  const [estoquePorLocal, setEstoquePorLocal] = useState([]);
   const [totalProduto, setTotalProduto] = useState(0);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -128,7 +135,9 @@ export default function App() {
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   const [filtroHistorico, setFiltroHistorico] = useState('todos');
 
-  // ===== EFETTO DE SESSÃO =====
+  // ================================================================
+  // 1. SESSÃO E CARREGAMENTO DE CATEGORIAS PERMITIDAS
+  // ================================================================
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSessao(session);
@@ -142,92 +151,138 @@ export default function App() {
     return () => listener?.subscription?.unsubscribe();
   }, []);
 
-  // ===== CARREGAR DADOS =====
+  // Carregar categorias permitidas quando o usuário logar
   useEffect(() => {
     if (sessao) {
-      carregarProdutos();
-      carregarItens();
-      carregarEstoqueTotal();
+      carregarCategoriasPermitidas();
     }
   }, [sessao]);
 
-  // ===== CARREGAR QUANTIDADES POR LOCAL E TOTAL DO PRODUTO =====
+  // Quando a categoria ativa mudar, recarregar os dados
   useEffect(() => {
-    if (form.produto_id) {
+    if (categoriaAtiva && sessao) {
+      carregarProdutosPorCategoria(categoriaAtiva);
+      carregarItensPorCategoria(categoriaAtiva);
+      carregarEstoqueTotalPorCategoria(categoriaAtiva);
+    }
+  }, [categoriaAtiva, sessao]);
+
+  // ================================================================
+  // 2. FUNÇÕES DE CARREGAMENTO (com filtro por categoria)
+  // ================================================================
+  async function carregarCategoriasPermitidas() {
+    setCarregandoCategorias(true);
+    try {
+      // Buscar as categorias que o usuário tem permissão
+      const { data, error } = await supabase
+        .from('user_categoria_permissao')
+        .select('categoria_id, categorias(*)')
+        .eq('user_id', sessao.user.id);
+
+      if (error) throw error;
+
+      const cats = data.map(item => item.categorias).filter(c => c !== null);
+      setCategoriasPermitidas(cats);
+
+      // Se houver categorias, seleciona a primeira como ativa
+      if (cats.length > 0) {
+        setCategoriaAtiva(cats[0]);
+      } else {
+        // Usuário não tem permissão para nenhuma categoria (caso raro)
+        setErro("Você não tem permissão para acessar nenhum ambiente.");
+      }
+    } catch (err) {
+      console.error("Erro ao carregar categorias:", err);
+      setErro("Erro ao carregar suas permissões.");
+    } finally {
+      setCarregandoCategorias(false);
+    }
+  }
+
+  async function carregarProdutosPorCategoria(categoria) {
+    if (!categoria) return;
+    const { data, error } = await supabase
+      .from("produtos")
+      .select("*")
+      .eq("categoria_id", categoria.id)
+      .order("nome", { ascending: true });
+    if (!error) setProdutos(data || []);
+  }
+
+  async function carregarItensPorCategoria(categoria) {
+    if (!categoria) return;
+    setCarregando(true);
+    // Buscar itens cujo produto está na categoria ativa
+    const { data, error } = await supabase
+      .from("itens")
+      .select(`
+        *,
+        produtos!inner (categoria_id)
+      `)
+      .eq("produtos.categoria_id", categoria.id)
+      .order("validade", { ascending: true });
+
+    if (error) {
+      console.error("Erro ao carregar itens:", error);
+      setErro("Erro ao carregar itens.");
+      setItens([]);
+    } else {
+      setItens(data || []);
+    }
+    setCarregando(false);
+  }
+
+  async function carregarEstoqueTotalPorCategoria(categoria) {
+    if (!categoria) return;
+    const { data, error } = await supabase
+      .from("estoque_total_produto")
+      .select("*")
+      .eq("categoria", categoria.nome)
+      .order("nome", { ascending: true });
+    if (!error) setEstoqueTotal(data || []);
+  }
+
+  // ===== CARREGAR QUANTIDADES POR LOCAL PARA O FORMULÁRIO =====
+  useEffect(() => {
+    if (form.produto_id && categoriaAtiva) {
       carregarQuantidadesProduto(form.produto_id);
     } else {
       setEstoquePorLocal([]);
       setTotalProduto(0);
     }
-  }, [form.produto_id]);
+  }, [form.produto_id, categoriaAtiva]);
 
   async function carregarQuantidadesProduto(produtoId) {
     if (!produtoId) return;
-    // Buscar quantidades por local
     const { data: localData, error: localError } = await supabase
       .from("estoque_por_local")
       .select("*")
       .eq("produto_id", produtoId);
-    if (!localError) {
-      setEstoquePorLocal(localData || []);
-    }
+    if (!localError) setEstoquePorLocal(localData || []);
 
-    // Buscar total geral
     const { data: totalData, error: totalError } = await supabase
       .from("estoque_total_produto")
       .select("quantidade_total")
       .eq("produto_id", produtoId)
       .maybeSingle();
-    if (!totalError && totalData) {
-      setTotalProduto(totalData.quantidade_total || 0);
-    } else {
-      setTotalProduto(0);
-    }
+    if (!totalError && totalData) setTotalProduto(totalData.quantidade_total || 0);
+    else setTotalProduto(0);
   }
 
-  async function carregarProdutos() {
-    const { data, error } = await supabase
-      .from("produtos")
-      .select("*")
-      .order("nome", { ascending: true });
-    if (error) {
-      console.error("Erro ao carregar produtos:", error);
-    } else {
-      setProdutos(data || []);
-    }
-  }
-
-  async function carregarItens() {
-    setCarregando(true);
-    const { data, error } = await supabase
-      .from("itens")
-      .select("*")
-      .order("validade", { ascending: true });
-    if (error) setErro("Erro ao carregar itens.");
-    else setItens(data || []);
-    setCarregando(false);
-  }
-
-  async function carregarEstoqueTotal() {
-    const { data, error } = await supabase
-      .from("estoque_total_produto")
-      .select("*")
-      .order("nome", { ascending: true });
-    if (!error) setEstoqueTotal(data || []);
-  }
-
-  // ===== LOGOUT =====
+  // ================================================================
+  // 3. LOGOUT
+  // ================================================================
   async function handleLogout() {
     await supabase.auth.signOut();
   }
 
-  // ===== FUNÇÕES DO FORMULÁRIO =====
+  // ================================================================
+  // 4. FUNÇÕES DO FORMULÁRIO (com categoria ativa)
+  // ================================================================
   function abrirNovo() {
     setForm({ ...vazio });
     setEditandoId(null);
     setMostrarForm(true);
-    setEstoquePorLocal([]);
-    setTotalProduto(0);
   }
 
   function abrirEdicao(item) {
@@ -243,7 +298,6 @@ export default function App() {
     });
     setEditandoId(item.id);
     setMostrarForm(true);
-    // As quantidades serão carregadas pelo useEffect de form.produto_id
   }
 
   function fecharForm() {
@@ -276,7 +330,7 @@ export default function App() {
       form.minimo === "" ||
       !form.local
     ) {
-      setErro("Preencha todos os campos obrigatórios (produto, lote, validade, quantidade, mínimo e local).");
+      setErro("Preencha todos os campos obrigatórios.");
       return;
     }
     setSalvando(true);
@@ -306,8 +360,8 @@ export default function App() {
     }
     if (error) setErro("Erro ao salvar.");
     else {
-      await carregarItens();
-      await carregarEstoqueTotal();
+      await carregarItensPorCategoria(categoriaAtiva);
+      await carregarEstoqueTotalPorCategoria(categoriaAtiva);
       fecharForm();
     }
     setSalvando(false);
@@ -318,12 +372,14 @@ export default function App() {
     const { error } = await supabase.from("itens").delete().eq("id", id);
     if (error) setErro("Erro ao excluir.");
     else {
-      await carregarItens();
-      await carregarEstoqueTotal();
+      await carregarItensPorCategoria(categoriaAtiva);
+      await carregarEstoqueTotalPorCategoria(categoriaAtiva);
     }
   }
 
-  // ===== RETIRADA =====
+  // ================================================================
+  // 5. RETIRADA
+  // ================================================================
   function abrirRetirar(item) {
     setItemRetirar(item);
     setQtdRetirar("");
@@ -389,13 +445,15 @@ export default function App() {
       created_by: sessao.user.id,
     });
 
-    await carregarItens();
-    await carregarEstoqueTotal();
+    await carregarItensPorCategoria(categoriaAtiva);
+    await carregarEstoqueTotalPorCategoria(categoriaAtiva);
     setSalvando(false);
     fecharRetirar();
   }
 
-  // ===== TRANSFERÊNCIA =====
+  // ================================================================
+  // 6. TRANSFERÊNCIA
+  // ================================================================
   function abrirTransferir(item) {
     setItemTransferir(item);
     setLocalDestino(LOCAIS.find((l) => l !== item.local) || "");
@@ -403,8 +461,10 @@ export default function App() {
     setMotivoTransferir("");
     setErro("");
     setMostrarTransferir(true);
-    // Carregar estoque por local para este produto (para exibir no modal)
-    carregarEstoquePorProduto(item.produto_id);
+    // Carregar estoque por local para este produto
+    if (item.produto_id) {
+      carregarEstoquePorProduto(item.produto_id);
+    }
   }
 
   async function carregarEstoquePorProduto(produtoId) {
@@ -469,7 +529,6 @@ export default function App() {
 
     let erroDestino = null;
     if (existente) {
-      // Atualizar quantidade no destino
       const r = await supabase
         .from("itens")
         .update({
@@ -479,7 +538,6 @@ export default function App() {
         .eq("id", existente.id);
       erroDestino = r.error;
     } else {
-      // Criar novo item no destino (com produto_id)
       const r = await supabase.from("itens").insert({
         produto_id: itemTransferir.produto_id,
         nome: itemTransferir.nome,
@@ -501,7 +559,6 @@ export default function App() {
       return;
     }
 
-    // Registrar movimentação
     await supabase.from("movimentacoes").insert({
       item_id: itemTransferir.id,
       item_nome: itemTransferir.nome,
@@ -515,23 +572,30 @@ export default function App() {
       produto_id: itemTransferir.produto_id,
     });
 
-    await carregarItens();
-    await carregarEstoqueTotal();
+    await carregarItensPorCategoria(categoriaAtiva);
+    await carregarEstoqueTotalPorCategoria(categoriaAtiva);
     setSalvando(false);
     fecharTransferir();
   }
 
-  // ===== HISTÓRICO =====
+  // ================================================================
+  // 7. HISTÓRICO (com filtro de categoria)
+  // ================================================================
   async function abrirHistorico(filtro = 'todos') {
     setMostrarHistorico(true);
     setCarregandoHistorico(true);
 
+    // Buscar movimentações onde o produto pertence à categoria ativa
     let query = supabase
       .from("movimentacoes")
       .select(`
         *,
-        profiles!created_by (nome)
+        profiles!created_by (nome),
+        itens!inner (
+          produtos!inner (categoria_id)
+        )
       `)
+      .eq("itens.produtos.categoria_id", categoriaAtiva.id)
       .order("criado_em", { ascending: false })
       .limit(50);
 
@@ -544,7 +608,9 @@ export default function App() {
     setCarregandoHistorico(false);
   }
 
-  // ===== CÁLCULOS =====
+  // ================================================================
+  // 8. CÁLCULOS E FILTROS (com categoria ativa)
+  // ================================================================
   const itensComStatus = useMemo(
     () =>
       itens.map((it) => {
@@ -581,8 +647,10 @@ export default function App() {
     return [...lista].sort((a, b) => a.nome.localeCompare(b.nome));
   }, [itensComStatus, filtroAlerta, filtroLocal, busca]);
 
-  // ===== RENDER =====
-  if (carregandoSessao) {
+  // ================================================================
+  // 9. RENDER
+  // ================================================================
+  if (carregandoSessao || carregandoCategorias) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-amber-50">
         <p className="text-gray-600">Carregando...</p>
@@ -594,11 +662,28 @@ export default function App() {
     return <Auth onLogin={() => {}} />;
   }
 
+  if (categoriasPermitidas.length === 0 && !carregandoCategorias) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-amber-50 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md text-center">
+          <h2 className="text-xl font-bold text-red-600 mb-2">Acesso Negado</h2>
+          <p className="text-gray-600">Você não tem permissão para acessar nenhum ambiente.</p>
+          <button
+            onClick={handleLogout}
+            className="mt-4 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600"
+          >
+            Sair
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-green-50 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* HEADER */}
-        <header className="relative overflow-hidden bg-gradient-to-r from-green-800 to-green-700 rounded-2xl p-5 sm:p-7 mb-8 shadow-xl shadow-green-900/30 border border-green-600/30">
+        {/* ===== HEADER ===== */}
+        <header className="relative overflow-hidden bg-gradient-to-r from-green-800 to-green-700 rounded-2xl p-5 sm:p-7 mb-6 shadow-xl shadow-green-900/30 border border-green-600/30">
           <div className="absolute -right-10 -top-10 w-48 h-48 bg-yellow-500/10 rounded-full blur-2xl" />
           <div className="absolute -left-10 bottom-0 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl" />
           <div className="relative flex items-center justify-between flex-wrap gap-4">
@@ -611,10 +696,12 @@ export default function App() {
                   Depósito Agrícola
                   <Tractor size={20} className="text-amber-300" />
                 </h1>
-                <p className="text-sm text-green-100">Defensivos e insumos</p>
+                <p className="text-sm text-green-100">
+                  {categoriaAtiva?.nome || "Selecione um ambiente"}
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => abrirHistorico(filtroHistorico)}
                 className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 border border-white/20 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all"
@@ -635,9 +722,26 @@ export default function App() {
               </button>
             </div>
           </div>
+
+          {/* ===== NAVEGAÇÃO POR CATEGORIAS (ABAS) ===== */}
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4">
+            {categoriasPermitidas.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setCategoriaAtiva(cat)}
+                className={`px-4 py-1.5 rounded-xl text-sm font-medium transition-all ${
+                  categoriaAtiva?.id === cat.id
+                    ? "bg-white text-green-800 shadow-md"
+                    : "bg-white/10 text-white hover:bg-white/20"
+                }`}
+              >
+                {cat.nome}
+              </button>
+            ))}
+          </div>
         </header>
 
-        {/* CARDS DE ALERTA */}
+        {/* ===== CARDS DE ALERTA ===== */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <button
             onClick={() =>
@@ -720,7 +824,7 @@ export default function App() {
           </button>
         </div>
 
-        {/* BUSCA E FILTRO */}
+        {/* ===== BUSCA E FILTRO ===== */}
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <Search
@@ -760,10 +864,12 @@ export default function App() {
           </div>
         )}
 
-        {/* RESUMO DE ESTOQUE TOTAL POR PRODUTO */}
+        {/* ===== RESUMO DE ESTOQUE TOTAL ===== */}
         {estoqueTotal.length > 0 && (
           <div className="mb-6 bg-white rounded-2xl border border-gray-200 shadow-md p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">📦 Resumo de Estoque por Produto</h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">
+              📦 Resumo de Estoque - {categoriaAtiva?.nome}
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-60 overflow-y-auto">
               {estoqueTotal.slice(0, 20).map((item) => (
                 <div key={item.produto_id} className="flex justify-between items-center border-b border-gray-100 py-1 px-2 text-sm">
@@ -780,7 +886,7 @@ export default function App() {
           </div>
         )}
 
-        {/* LISTA DE ITENS EM GRID */}
+        {/* ===== LISTA DE ITENS ===== */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {carregando ? (
             <div className="col-span-full bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400 text-sm">
@@ -789,7 +895,7 @@ export default function App() {
           ) : listaFiltrada.length === 0 ? (
             <div className="col-span-full bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400 text-sm">
               {itens.length === 0
-                ? "Nenhum item cadastrado ainda."
+                ? `Nenhum item cadastrado na categoria ${categoriaAtiva?.nome}.`
                 : "Nenhum item corresponde ao filtro."}
             </div>
           ) : (
@@ -888,13 +994,15 @@ export default function App() {
         </div>
       </div>
 
-      {/* ===== MODAL - FORMULÁRIO (com resumo de quantidades por local) ===== */}
+      {/* ===== MODAIS (mesma estrutura, apenas adaptados) ===== */}
+
+      {/* MODAL - FORMULÁRIO */}
       {mostrarForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
             <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-green-800 to-green-700">
               <h2 className="font-semibold text-white text-lg">
-                {editandoId ? "Editar item" : "Novo item"}
+                {editandoId ? "Editar item" : "Novo item"} - {categoriaAtiva?.nome}
               </h2>
               <button
                 onClick={fecharForm}
@@ -904,11 +1012,8 @@ export default function App() {
               </button>
             </div>
             <div className="px-6 py-6 space-y-5 max-h-[75vh] overflow-y-auto">
-              {/* SELETOR DE PRODUTO */}
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Produto *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Produto *</label>
                 <select
                   value={form.produto_id}
                   onChange={(e) => handleProdutoSelecionado(e.target.value)}
@@ -923,12 +1028,9 @@ export default function App() {
                 </select>
               </div>
 
-              {/* RESUMO DE QUANTIDADES POR LOCAL (quando produto selecionado) */}
               {form.produto_id && (
                 <div className="bg-green-50 rounded-xl p-3 border border-green-200">
-                  <p className="text-xs font-medium text-green-700 mb-1">
-                    📦 Quantidade atual por local:
-                  </p>
+                  <p className="text-xs font-medium text-green-700 mb-1">📦 Quantidade atual por local:</p>
                   <div className="grid grid-cols-2 gap-1 text-xs">
                     {estoquePorLocal.length > 0 ? (
                       estoquePorLocal.map((item) => (
@@ -949,18 +1051,14 @@ export default function App() {
               )}
 
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Local de armazenamento *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Local de armazenamento *</label>
                 <select
                   value={form.local}
                   onChange={(e) => setForm({ ...form, local: e.target.value })}
                   className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                 >
                   {LOCAIS.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
+                    <option key={l} value={l}>{l}</option>
                   ))}
                 </select>
               </div>
@@ -1006,9 +1104,7 @@ export default function App() {
                     className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                   >
                     {UNIDADES.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
+                      <option key={u} value={u}>{u}</option>
                     ))}
                   </select>
                 </div>
@@ -1051,7 +1147,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ===== MODAL - RETIRAR ===== */}
+      {/* MODAL - RETIRAR */}
       {mostrarRetirar && itemRetirar && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -1075,9 +1171,7 @@ export default function App() {
                 </p>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Quantidade a retirar *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Quantidade a retirar *</label>
                 <div className="flex items-center gap-2 mt-1">
                   <input
                     type="number"
@@ -1092,9 +1186,7 @@ export default function App() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Motivo da saída *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Motivo da saída *</label>
                 <select
                   value={motivoRetirar}
                   onChange={(e) => {
@@ -1111,9 +1203,7 @@ export default function App() {
               </div>
               {motivoRetirar === "Outro" && (
                 <div>
-                  <label className="text-xs font-medium text-gray-600">
-                    Descreva o motivo *
-                  </label>
+                  <label className="text-xs font-medium text-gray-600">Descreva o motivo *</label>
                   <input
                     value={motivoPersonalizado}
                     onChange={(e) => setMotivoPersonalizado(e.target.value)}
@@ -1147,7 +1237,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ===== MODAL - TRANSFERIR ===== */}
+      {/* MODAL - TRANSFERIR */}
       {mostrarTransferir && itemTransferir && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -1174,7 +1264,6 @@ export default function App() {
                 </p>
               </div>
 
-              {/* EXIBIÇÃO DE QUANTIDADE POR LOCAL (na transferência) */}
               {estoquePorLocal.length > 0 && (
                 <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
                   <p className="text-xs font-medium text-blue-700 mb-1">📦 Quantidade disponível por local:</p>
@@ -1190,25 +1279,19 @@ export default function App() {
               )}
 
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Transferir para *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Transferir para *</label>
                 <select
                   value={localDestino}
                   onChange={(e) => setLocalDestino(e.target.value)}
                   className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
                 >
                   {LOCAIS.filter((l) => l !== itemTransferir.local).map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
+                    <option key={l} value={l}>{l}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Quantidade a transferir *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Quantidade a transferir *</label>
                 <div className="flex items-center gap-2 mt-1">
                   <input
                     type="number"
@@ -1223,9 +1306,7 @@ export default function App() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Observação (opcional)
-                </label>
+                <label className="text-xs font-medium text-gray-600">Observação (opcional)</label>
                 <input
                   value={motivoTransferir}
                   onChange={(e) => setMotivoTransferir(e.target.value)}
@@ -1258,13 +1339,13 @@ export default function App() {
         </div>
       )}
 
-      {/* ===== MODAL - HISTÓRICO ===== */}
+      {/* MODAL - HISTÓRICO */}
       {mostrarHistorico && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[80vh] flex flex-col border border-white/20">
             <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-green-800 to-green-700 shrink-0">
               <h2 className="font-semibold text-white text-lg flex items-center gap-2">
-                <History size={20} /> Histórico de movimentações
+                <History size={20} /> Histórico de movimentações - {categoriaAtiva?.nome}
               </h2>
               <button
                 onClick={() => setMostrarHistorico(false)}
@@ -1274,7 +1355,6 @@ export default function App() {
               </button>
             </div>
             <div className="px-6 py-4 overflow-y-auto">
-              {/* Seletor de filtro */}
               <div className="flex items-center gap-2 mb-3">
                 <label className="text-xs font-medium text-gray-600">Filtrar por:</label>
                 <select
@@ -1295,7 +1375,7 @@ export default function App() {
                 <p className="text-sm text-gray-400 text-center py-8">Carregando...</p>
               ) : historico.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-8">
-                  Nenhuma movimentação registrada ainda.
+                  Nenhuma movimentação registrada nesta categoria.
                 </p>
               ) : (
                 <div className="space-y-2">
