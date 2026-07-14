@@ -13,67 +13,37 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
 
   async function carregarCategorias() {
     try {
-      console.log("=== DEBUG START ===");
-      console.log("User ID:", sessao.user.id);
-      console.log("User Email:", sessao.user.email);
-
       // PASSO 1: Buscar IDs das categorias permitidas
       const { data: perms, error: errorPerms } = await supabase
         .from('user_categoria_permissao')
         .select('categoria_id')
         .eq('user_id', sessao.user.id);
 
-      console.log("Permissões retornadas:", perms);
-      console.log("Erro permissões:", errorPerms);
-
-      if (errorPerms) {
-        console.error("Erro ao buscar permissões:", errorPerms);
-        setErro("Erro ao carregar permissões: " + errorPerms.message);
-        return;
-      }
+      if (errorPerms) throw errorPerms;
 
       if (!perms || perms.length === 0) {
-        console.log("Nenhuma permissão encontrada.");
         setCategorias([]);
         setCarregando(false);
         return;
       }
 
       const ids = perms.map(p => p.categoria_id);
-      console.log("IDs das categorias:", ids);
 
       // PASSO 2: Buscar dados completos das categorias
-      console.log("Buscando categorias com IDs:", ids);
       const { data: cats, error: errorCats } = await supabase
         .from('categorias')
         .select('*')
         .in('id', ids)
         .order('nome', { ascending: true });
 
-      console.log("Categorias retornadas:", cats);
-      console.log("Erro categorias:", errorCats);
+      if (errorCats) throw errorCats;
 
-      if (errorCats) {
-        console.error("Erro ao buscar categorias:", errorCats);
-        setErro("Erro ao carregar categorias: " + errorCats.message);
-        return;
-      }
-
-      // Verificar se o retorno é um array válido
-      if (!cats || cats.length === 0) {
-        console.warn("Nenhuma categoria encontrada com os IDs fornecidos.");
-        setCategorias([]);
-        setCarregando(false);
-        return;
-      }
-
-      setCategorias(cats);
+      setCategorias(cats || []);
     } catch (err) {
-      console.error("Erro inesperado:", err);
-      setErro("Erro ao carregar permissões: " + err.message);
+      console.error(err);
+      setErro(err.message);
     } finally {
       setCarregando(false);
-      console.log("=== DEBUG END ===");
     }
   }
 
@@ -105,7 +75,6 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-green-50 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* HEADER */}
         <header className="relative overflow-hidden bg-gradient-to-r from-green-800 to-green-700 rounded-2xl p-5 sm:p-7 mb-8 shadow-xl shadow-green-900/30 border border-green-600/30">
           <div className="absolute -right-10 -top-10 w-48 h-48 bg-yellow-500/10 rounded-full blur-2xl" />
           <div className="absolute -left-10 bottom-0 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl" />
@@ -133,7 +102,6 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
           </div>
         </header>
 
-        {/* GRID DE SETORES */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {categorias.map((cat) => (
             <button
