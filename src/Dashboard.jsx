@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
-// Mapeamento de ícones por categoria
 const iconMap = {
   'ADUBO': Flower2,
   'BOMBAS': Waves,
@@ -48,54 +47,40 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
 
   async function carregarCategorias() {
     try {
-      // Buscar todas as categorias (RLS desabilitado)
       const { data, error } = await supabase
         .from('categorias')
         .select('*')
         .order('nome', { ascending: true });
 
       if (error) {
-        console.error("Erro ao buscar categorias:", error);
         setErro("Erro ao carregar categorias: " + error.message);
         return;
       }
-
-      console.log("Categorias carregadas:", data);
       setCategorias(data || []);
     } catch (err) {
-      console.error("Erro inesperado:", err);
       setErro("Erro ao carregar categorias: " + err.message);
     } finally {
       setCarregando(false);
     }
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-  }
-
-  // Função para obter o ícone da categoria
   const getIcon = (nome) => {
     const Icon = iconMap[nome] || Layers;
     return <Icon size={32} className="text-green-700" />;
   };
 
-  if (carregando) {
-    return <div className="min-h-screen flex items-center justify-center bg-amber-50">Carregando...</div>;
+  async function handleLogout() {
+    await supabase.auth.signOut();
   }
 
+  if (carregando) return <div className="min-h-screen flex items-center justify-center bg-amber-50">Carregando...</div>;
   if (erro) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-amber-50 p-4">
         <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md text-center">
           <h2 className="text-xl font-bold text-red-600 mb-2">Erro</h2>
           <p className="text-gray-600">{erro}</p>
-          <button
-            onClick={carregarCategorias}
-            className="mt-4 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700"
-          >
-            Tentar novamente
-          </button>
+          <button onClick={carregarCategorias} className="mt-4 px-4 py-2 bg-green-600 text-white rounded-xl">Tentar novamente</button>
         </div>
       </div>
     );
@@ -121,17 +106,13 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 bg-red-500/20 text-white hover:bg-red-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
-              >
+              <button onClick={handleLogout} className="flex items-center gap-1.5 bg-red-500/20 text-white hover:bg-red-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10">
                 <LogOut size={18} /> Sair
               </button>
             </div>
           </div>
         </header>
 
-        {/* Grid de categorias */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {categorias.map((cat) => (
             <button
@@ -156,7 +137,6 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
         {categorias.length === 0 && (
           <div className="bg-white rounded-2xl p-10 text-center text-gray-500">
             <p>Nenhuma categoria encontrada.</p>
-            <p className="text-sm text-gray-400 mt-2">Verifique se a tabela categorias tem dados.</p>
           </div>
         )}
       </div>
