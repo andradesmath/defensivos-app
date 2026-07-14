@@ -43,6 +43,7 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
       console.log("IDs das categorias:", ids);
 
       // PASSO 2: Buscar dados completos das categorias
+      console.log("Buscando categorias com IDs:", ids);
       const { data: cats, error: errorCats } = await supabase
         .from('categorias')
         .select('*')
@@ -58,7 +59,15 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
         return;
       }
 
-      setCategorias(cats || []);
+      // Verificar se o retorno é um array válido
+      if (!cats || cats.length === 0) {
+        console.warn("Nenhuma categoria encontrada com os IDs fornecidos.");
+        setCategorias([]);
+        setCarregando(false);
+        return;
+      }
+
+      setCategorias(cats);
     } catch (err) {
       console.error("Erro inesperado:", err);
       setErro("Erro ao carregar permissões: " + err.message);
