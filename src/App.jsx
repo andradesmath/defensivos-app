@@ -9,6 +9,8 @@ import Auth from "./Auth";
 
 const DIAS_ALERTA_VENCIMENTO = 90;
 const UNIDADES = ["L", "mL", "kg", "g", "un"];
+
+// ===== LOCAIS =====
 const LOCAIS = [
   "Casa de Adubo - Depósito",
   "Casa de Adubo - Balcão",
@@ -19,6 +21,8 @@ const LOCAIS = [
   "Piatã - Depósito",
   "Piatã - Balcão",
 ];
+
+// ===== MOTIVOS DE SAÍDA =====
 const MOTIVOS_SAIDA = [
   "Aplicação",
   "Perda por Deterioração",
@@ -113,6 +117,7 @@ export default function App() {
   const [historico, setHistorico] = useState([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
 
+  // ===== SESSÃO =====
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSessao(session);
@@ -126,6 +131,7 @@ export default function App() {
     return () => listener?.subscription?.unsubscribe();
   }, []);
 
+  // ===== CARREGAR PRODUTOS E ITENS =====
   useEffect(() => {
     if (sessao) {
       carregarProdutos();
@@ -134,14 +140,16 @@ export default function App() {
   }, [sessao]);
 
   async function carregarProdutos() {
+    console.log("🔄 Carregando produtos...");
     const { data, error } = await supabase
       .from("produtos")
       .select("*")
       .order("nome", { ascending: true });
     if (error) {
-      console.error("Erro ao carregar produtos:", error);
+      console.error("❌ Erro ao carregar produtos:", error);
+      setErro("Erro ao carregar lista de produtos.");
     } else {
-      console.log("Produtos carregados:", data?.length);
+      console.log(`✅ ${data.length} produtos carregados.`);
       setProdutos(data || []);
     }
   }
@@ -210,7 +218,7 @@ export default function App() {
       form.minimo === "" ||
       !form.local
     ) {
-      setErro("Preencha todos os campos obrigatórios (produto, lote, validade, quantidade, mínimo e local).");
+      setErro("Preencha todos os campos obrigatórios.");
       return;
     }
     setSalvando(true);
@@ -535,78 +543,41 @@ export default function App() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <button
-            onClick={() =>
-              setFiltroAlerta(filtroAlerta === "vencidos" ? "todos" : "vencidos")
-            }
+            onClick={() => setFiltroAlerta(filtroAlerta === "vencidos" ? "todos" : "vencidos")}
             className={`group flex items-center gap-4 p-5 rounded-2xl border-2 bg-white transition-all hover:shadow-lg hover:scale-[1.02] ${
-              alertas.vencidos > 0
-                ? "border-red-300 shadow-red-100/50"
-                : "border-gray-200"
-            } ${
-              filtroAlerta === "vencidos"
-                ? "ring-2 ring-red-400 ring-offset-2"
-                : ""
-            }`}
+              alertas.vencidos > 0 ? "border-red-300 shadow-red-100/50" : "border-gray-200"
+            } ${filtroAlerta === "vencidos" ? "ring-2 ring-red-400 ring-offset-2" : ""}`}
           >
             <div className={`p-3 rounded-xl ${alertas.vencidos > 0 ? "bg-red-50" : "bg-gray-50"}`}>
-              <PackageX
-                size={24}
-                className={alertas.vencidos > 0 ? "text-red-600" : "text-gray-300"}
-              />
+              <PackageX size={24} className={alertas.vencidos > 0 ? "text-red-600" : "text-gray-300"} />
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{alertas.vencidos}</p>
               <p className="text-xs text-gray-500 font-medium">Produtos vencidos</p>
             </div>
           </button>
-
           <button
-            onClick={() =>
-              setFiltroAlerta(filtroAlerta === "proximos" ? "todos" : "proximos")
-            }
+            onClick={() => setFiltroAlerta(filtroAlerta === "proximos" ? "todos" : "proximos")}
             className={`group flex items-center gap-4 p-5 rounded-2xl border-2 bg-white transition-all hover:shadow-lg hover:scale-[1.02] ${
-              alertas.proximos > 0
-                ? "border-amber-300 shadow-amber-100/50"
-                : "border-gray-200"
-            } ${
-              filtroAlerta === "proximos"
-                ? "ring-2 ring-amber-400 ring-offset-2"
-                : ""
-            }`}
+              alertas.proximos > 0 ? "border-amber-300 shadow-amber-100/50" : "border-gray-200"
+            } ${filtroAlerta === "proximos" ? "ring-2 ring-amber-400 ring-offset-2" : ""}`}
           >
             <div className={`p-3 rounded-xl ${alertas.proximos > 0 ? "bg-amber-50" : "bg-gray-50"}`}>
-              <AlertTriangle
-                size={24}
-                className={alertas.proximos > 0 ? "text-amber-600" : "text-gray-300"}
-              />
+              <AlertTriangle size={24} className={alertas.proximos > 0 ? "text-amber-600" : "text-gray-300"} />
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{alertas.proximos}</p>
-              <p className="text-xs text-gray-500 font-medium">
-                Vencendo em {DIAS_ALERTA_VENCIMENTO} dias
-              </p>
+              <p className="text-xs text-gray-500 font-medium">Vencendo em {DIAS_ALERTA_VENCIMENTO} dias</p>
             </div>
           </button>
-
           <button
-            onClick={() =>
-              setFiltroAlerta(filtroAlerta === "baixos" ? "todos" : "baixos")
-            }
+            onClick={() => setFiltroAlerta(filtroAlerta === "baixos" ? "todos" : "baixos")}
             className={`group flex items-center gap-4 p-5 rounded-2xl border-2 bg-white transition-all hover:shadow-lg hover:scale-[1.02] ${
-              alertas.baixos > 0
-                ? "border-orange-300 shadow-orange-100/50"
-                : "border-gray-200"
-            } ${
-              filtroAlerta === "baixos"
-                ? "ring-2 ring-orange-400 ring-offset-2"
-                : ""
-            }`}
+              alertas.baixos > 0 ? "border-orange-300 shadow-orange-100/50" : "border-gray-200"
+            } ${filtroAlerta === "baixos" ? "ring-2 ring-orange-400 ring-offset-2" : ""}`}
           >
             <div className={`p-3 rounded-xl ${alertas.baixos > 0 ? "bg-orange-50" : "bg-gray-50"}`}>
-              <AlertOctagon
-                size={24}
-                className={alertas.baixos > 0 ? "text-orange-600" : "text-gray-300"}
-              />
+              <AlertOctagon size={24} className={alertas.baixos > 0 ? "text-orange-600" : "text-gray-300"} />
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{alertas.baixos}</p>
@@ -617,10 +588,7 @@ export default function App() {
 
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
-            <Search
-              size={17}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-            />
+            <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
@@ -629,10 +597,7 @@ export default function App() {
             />
           </div>
           <div className="relative sm:w-64">
-            <MapPin
-              size={16}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-            />
+            <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <select
               value={filtroLocal}
               onChange={(e) => setFiltroLocal(e.target.value)}
@@ -640,9 +605,7 @@ export default function App() {
             >
               <option value="todos">Todos os locais</option>
               {LOCAIS.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
+                <option key={l} value={l}>{l}</option>
               ))}
             </select>
           </div>
@@ -661,96 +624,54 @@ export default function App() {
             </div>
           ) : listaFiltrada.length === 0 ? (
             <div className="col-span-full bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400 text-sm">
-              {itens.length === 0
-                ? "Nenhum item cadastrado ainda."
-                : "Nenhum item corresponde ao filtro."}
+              {itens.length === 0 ? "Nenhum item cadastrado ainda." : "Nenhum item corresponde ao filtro."}
             </div>
           ) : (
             listaFiltrada.map((it) => {
-              const pct =
-                it.minimo > 0
-                  ? Math.min(100, Math.round((it.quantidade / (it.minimo * 2)) * 100))
-                  : 100;
+              const pct = it.minimo > 0 ? Math.min(100, Math.round((it.quantidade / (it.minimo * 2)) * 100)) : 100;
               const status = getStatusInfo(it);
-
               return (
-                <div
-                  key={it.id}
-                  className="bg-white rounded-2xl border border-gray-200 shadow-md hover:shadow-lg transition-all overflow-hidden flex flex-col"
-                >
+                <div key={it.id} className="bg-white rounded-2xl border border-gray-200 shadow-md hover:shadow-lg transition-all overflow-hidden flex flex-col">
                   <div className="p-4 pb-2 flex items-start justify-between gap-2 border-b border-gray-100">
                     <div>
-                      <h3 className="font-bold text-gray-800 text-lg leading-tight">
-                        {it.nome}
-                      </h3>
+                      <h3 className="font-bold text-gray-800 text-lg leading-tight">{it.nome}</h3>
                       <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
                         <MapPin size={12} />
                         <span>{it.local}</span>
                       </div>
                     </div>
-                    <span
-                      className={`text-xs font-semibold px-2 py-1 rounded-full border ${status.class}`}
-                    >
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${status.class}`}>
                       {status.label}
                     </span>
                   </div>
-
                   <div className="p-4 space-y-2 flex-1">
                     <div className="grid grid-cols-2 gap-1 text-sm">
                       <span className="text-gray-500">Lote:</span>
-                      <span className="font-medium text-gray-700 text-right">
-                        {it.lote}
-                      </span>
+                      <span className="font-medium text-gray-700 text-right">{it.lote}</span>
                       <span className="text-gray-500">Validade:</span>
-                      <span className="font-medium text-gray-700 text-right">
-                        {formatarDataBR(it.validade)}
-                      </span>
+                      <span className="font-medium text-gray-700 text-right">{formatarDataBR(it.validade)}</span>
                       <span className="text-gray-500">Quantidade:</span>
-                      <span className="font-medium text-gray-700 text-right">
-                        {it.quantidade} {it.unidade}
-                      </span>
+                      <span className="font-medium text-gray-700 text-right">{it.quantidade} {it.unidade}</span>
                       <span className="text-gray-500">Mínimo:</span>
-                      <span className="font-medium text-gray-700 text-right">
-                        {it.minimo} {it.unidade}
-                      </span>
+                      <span className="font-medium text-gray-700 text-right">{it.minimo} {it.unidade}</span>
                     </div>
                     <div className="mt-1 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${corProgresso(pct)}`}
-                        style={{ width: `${pct}%` }}
-                      />
+                      <div className={`h-full rounded-full transition-all duration-500 ${corProgresso(pct)}`} style={{ width: `${pct}%` }} />
                     </div>
                   </div>
-
                   <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
                     <div className="flex gap-1">
-                      <button
-                        onClick={() => abrirTransferir(it)}
-                        className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                        title="Transferir"
-                      >
+                      <button onClick={() => abrirTransferir(it)} className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Transferir">
                         <ArrowLeftRight size={16} />
                       </button>
-                      <button
-                        onClick={() => abrirRetirar(it)}
-                        className="p-2 text-gray-500 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                        title="Dar baixa"
-                      >
+                      <button onClick={() => abrirRetirar(it)} className="p-2 text-gray-500 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors" title="Dar baixa">
                         <PackageMinus size={16} />
                       </button>
-                      <button
-                        onClick={() => abrirEdicao(it)}
-                        className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Editar"
-                      >
+                      <button onClick={() => abrirEdicao(it)} className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Editar">
                         <Pencil size={16} />
                       </button>
                     </div>
-                    <button
-                      onClick={() => excluir(it.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Excluir"
-                    >
+                    <button onClick={() => excluir(it.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -761,26 +682,20 @@ export default function App() {
         </div>
       </div>
 
-      {/* MODAL - FORMULÁRIO */}
+      {/* MODAL FORM */}
       {mostrarForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
             <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-green-800 to-green-700">
-              <h2 className="font-semibold text-white text-lg">
-                {editandoId ? "Editar item" : "Novo item"}
-              </h2>
-              <button
-                onClick={fecharForm}
-                className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"
-              >
+              <h2 className="font-semibold text-white text-lg">{editandoId ? "Editar item" : "Novo item"}</h2>
+              <button onClick={fecharForm} className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors">
                 <X size={20} />
               </button>
             </div>
             <div className="px-6 py-6 space-y-5 max-h-[75vh] overflow-y-auto">
+              {/* SELETOR DE PRODUTO */}
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Produto *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Produto *</label>
                 <select
                   value={form.produto_id}
                   onChange={(e) => handleProdutoSelecionado(e.target.value)}
@@ -793,21 +708,21 @@ export default function App() {
                     </option>
                   ))}
                 </select>
+                {/* Mostrar quantidade de produtos carregados para depuração */}
+                <p className="text-xs text-gray-400 mt-1">
+                  {produtos.length} produtos disponíveis
+                </p>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Local de armazenamento *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Local de armazenamento *</label>
                 <select
                   value={form.local}
                   onChange={(e) => setForm({ ...form, local: e.target.value })}
                   className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                 >
                   {LOCAIS.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
+                    <option key={l} value={l}>{l}</option>
                   ))}
                 </select>
               </div>
@@ -853,9 +768,7 @@ export default function App() {
                     className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                   >
                     {UNIDADES.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
+                      <option key={u} value={u}>{u}</option>
                     ))}
                   </select>
                 </div>
@@ -898,7 +811,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL - RETIRAR */}
+      {/* MODAL RETIRAR */}
       {mostrarRetirar && itemRetirar && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -906,10 +819,7 @@ export default function App() {
               <h2 className="font-semibold text-white text-lg flex items-center gap-2">
                 <PackageMinus size={20} /> Dar baixa no estoque
               </h2>
-              <button
-                onClick={fecharRetirar}
-                className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"
-              >
+              <button onClick={fecharRetirar} className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -917,14 +827,11 @@ export default function App() {
               <div className="bg-gray-50 rounded-xl p-3">
                 <p className="font-medium text-gray-800">{itemRetirar.nome}</p>
                 <p className="text-xs text-gray-500">
-                  {itemRetirar.local} · Lote {itemRetirar.lote} · Disponível:{" "}
-                  {itemRetirar.quantidade} {itemRetirar.unidade}
+                  {itemRetirar.local} · Lote {itemRetirar.lote} · Disponível: {itemRetirar.quantidade} {itemRetirar.unidade}
                 </p>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Quantidade a retirar *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Quantidade a retirar *</label>
                 <div className="flex items-center gap-2 mt-1">
                   <input
                     type="number"
@@ -939,9 +846,7 @@ export default function App() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Motivo da saída *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Motivo da saída *</label>
                 <select
                   value={motivoRetirar}
                   onChange={(e) => {
@@ -958,9 +863,7 @@ export default function App() {
               </div>
               {motivoRetirar === "Outro" && (
                 <div>
-                  <label className="text-xs font-medium text-gray-600">
-                    Descreva o motivo *
-                  </label>
+                  <label className="text-xs font-medium text-gray-600">Descreva o motivo *</label>
                   <input
                     value={motivoPersonalizado}
                     onChange={(e) => setMotivoPersonalizado(e.target.value)}
@@ -970,22 +873,13 @@ export default function App() {
                 </div>
               )}
               {erro && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">
-                  {erro}
-                </div>
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">{erro}</div>
               )}
               <div className="flex gap-2 pt-1">
-                <button
-                  onClick={fecharRetirar}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
-                >
+                <button onClick={fecharRetirar} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors">
                   Cancelar
                 </button>
-                <button
-                  onClick={confirmarRetirada}
-                  disabled={salvando}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60"
-                >
+                <button onClick={confirmarRetirada} disabled={salvando} className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60">
                   <Check size={16} /> {salvando ? "Salvando..." : "Confirmar baixa"}
                 </button>
               </div>
@@ -994,7 +888,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL - TRANSFERIR */}
+      {/* MODAL TRANSFERIR */}
       {mostrarTransferir && itemTransferir && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -1002,10 +896,7 @@ export default function App() {
               <h2 className="font-semibold text-white text-lg flex items-center gap-2">
                 <ArrowLeftRight size={20} /> Transferir entre locais
               </h2>
-              <button
-                onClick={fecharTransferir}
-                className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"
-              >
+              <button onClick={fecharTransferir} className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -1013,33 +904,26 @@ export default function App() {
               <div className="bg-gray-50 rounded-xl p-3">
                 <p className="font-medium text-gray-800">{itemTransferir.nome}</p>
                 <p className="text-xs text-gray-500">
-                  Lote {itemTransferir.lote} · Disponível:{" "}
-                  {itemTransferir.quantidade} {itemTransferir.unidade}
+                  Lote {itemTransferir.lote} · Disponível: {itemTransferir.quantidade} {itemTransferir.unidade}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   De: <span className="font-medium text-gray-700">{itemTransferir.local}</span>
                 </p>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Transferir para *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Transferir para *</label>
                 <select
                   value={localDestino}
                   onChange={(e) => setLocalDestino(e.target.value)}
                   className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
                 >
                   {LOCAIS.filter((l) => l !== itemTransferir.local).map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
+                    <option key={l} value={l}>{l}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Quantidade a transferir *
-                </label>
+                <label className="text-xs font-medium text-gray-600">Quantidade a transferir *</label>
                 <div className="flex items-center gap-2 mt-1">
                   <input
                     type="number"
@@ -1054,9 +938,7 @@ export default function App() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">
-                  Observação (opcional)
-                </label>
+                <label className="text-xs font-medium text-gray-600">Observação (opcional)</label>
                 <input
                   value={motivoTransferir}
                   onChange={(e) => setMotivoTransferir(e.target.value)}
@@ -1065,22 +947,13 @@ export default function App() {
                 />
               </div>
               {erro && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">
-                  {erro}
-                </div>
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">{erro}</div>
               )}
               <div className="flex gap-2 pt-1">
-                <button
-                  onClick={fecharTransferir}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
-                >
+                <button onClick={fecharTransferir} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors">
                   Cancelar
                 </button>
-                <button
-                  onClick={confirmarTransferencia}
-                  disabled={salvando}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60"
-                >
+                <button onClick={confirmarTransferencia} disabled={salvando} className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60">
                   <Check size={16} /> {salvando ? "Transferindo..." : "Confirmar transferência"}
                 </button>
               </div>
@@ -1089,7 +962,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL - HISTÓRICO */}
+      {/* MODAL HISTÓRICO */}
       {mostrarHistorico && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[80vh] flex flex-col border border-white/20">
@@ -1097,10 +970,7 @@ export default function App() {
               <h2 className="font-semibold text-white text-lg flex items-center gap-2">
                 <History size={20} /> Histórico de movimentações
               </h2>
-              <button
-                onClick={() => setMostrarHistorico(false)}
-                className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"
-              >
+              <button onClick={() => setMostrarHistorico(false)} className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -1108,53 +978,29 @@ export default function App() {
               {carregandoHistorico ? (
                 <p className="text-sm text-gray-400 text-center py-8">Carregando...</p>
               ) : historico.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">
-                  Nenhuma movimentação registrada ainda.
-                </p>
+                <p className="text-sm text-gray-400 text-center py-8">Nenhuma movimentação registrada ainda.</p>
               ) : (
                 <div className="space-y-2">
                   {historico.map((h) => (
-                    <div
-                      key={h.id}
-                      className="flex items-center justify-between gap-3 py-2.5 border-b border-gray-100 last:border-0"
-                    >
+                    <div key={h.id} className="flex items-center justify-between gap-3 py-2.5 border-b border-gray-100 last:border-0">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">
-                          {h.item_nome}
-                        </p>
+                        <p className="text-sm font-medium text-gray-800 truncate">{h.item_nome}</p>
                         <p className="text-xs text-gray-500 flex flex-wrap items-center gap-1">
                           <span>{formatarDataHoraBR(h.criado_em)}</span>
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-full ${
-                              h.tipo === "transferencia"
-                                ? "bg-indigo-100 text-indigo-700"
-                                : "bg-teal-100 text-teal-700"
-                            }`}
-                          >
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${h.tipo === "transferencia" ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700"}`}>
                             {h.tipo === "transferencia" ? "Transferência" : "Saída"}
                           </span>
                           {h.tipo === "transferencia" ? (
-                            <span>
-                              {h.local_origem} → {h.local_destino}
-                            </span>
+                            <span>{h.local_origem} → {h.local_destino}</span>
                           ) : (
                             <span>{h.local_origem || ""}</span>
                           )}
                           {h.motivo && <span className="text-gray-400">· {h.motivo}</span>}
-                          {h.profiles?.nome && (
-                            <span className="text-gray-400">· {h.profiles.nome}</span>
-                          )}
+                          {h.profiles?.nome && <span className="text-gray-400">· {h.profiles.nome}</span>}
                         </p>
                       </div>
-                      <span
-                        className={`text-sm font-semibold shrink-0 ${
-                          h.tipo === "transferencia"
-                            ? "text-indigo-700"
-                            : "text-teal-700"
-                        }`}
-                      >
-                        {h.tipo === "transferencia" ? "" : "-"}
-                        {h.quantidade} {h.unidade}
+                      <span className={`text-sm font-semibold shrink-0 ${h.tipo === "transferencia" ? "text-indigo-700" : "text-teal-700"}`}>
+                        {h.tipo === "transferencia" ? "" : "-"}{h.quantidade} {h.unidade}
                       </span>
                     </div>
                   ))}
