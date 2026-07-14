@@ -14,19 +14,43 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
   async function carregarCategorias() {
     try {
       console.log("Buscando permissões para usuário:", sessao.user.id);
-      const { data, error } = await supabase
+
+      // Passo 1: Buscar os IDs das categorias que o usuário tem permissão
+      const { data: perms, error: errorPerms } = await supabase
         .from('user_categoria_permissao')
-        .select('categoria_id, categorias(*)')
+        .select('categoria_id')
         .eq('user_id', sessao.user.id);
 
-      if (error) {
-        console.error("Erro na consulta:", error);
-        setErro("Erro ao carregar permissões: " + error.message);
+      if (errorPerms) {
+        console.error("Erro ao buscar permissões:", errorPerms);
+        setErro("Erro ao carregar permissões: " + errorPerms.message);
         return;
       }
-      console.log("Dados recebidos:", data);
-      const cats = data.map(item => item.categorias).filter(c => c !== null);
-      setCategorias(cats);
+
+      console.log("IDs de categorias permitidas:", perms);
+
+      if (!perms || perms.length === 0) {
+        setCategorias([]);
+        setCarregando(false);
+        return;
+      }
+
+      const ids = perms.map(p => p.categoria_id);
+
+      // Passo 2: Buscar os dados completos das categorias
+      const { data: cats, error: errorCats } = await supabase
+        .from('categorias')
+        .select('*')
+        .in('id', ids)
+        .order('nome', { ascending: true });
+
+      if (errorCats) {
+        console.error("Erro ao buscar categorias:", errorCats);
+        setErro("Erro ao carregar categorias: " + errorCats.message);
+        return;
+      }
+
+      setCategorias(cats || []);
     } catch (err) {
       console.error("Erro inesperado:", err);
       setErro("Erro ao carregar permissões: " + err.message);
