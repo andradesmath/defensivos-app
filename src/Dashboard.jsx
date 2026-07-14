@@ -13,22 +13,23 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
 
   async function carregarCategorias() {
     try {
-      // Usar a função RPC para buscar categorias permitidas
-      const { data, error } = await supabase.rpc('get_categorias_permitidas', {
-        user_id: sessao.user.id
-      });
+      // Buscar todas as categorias (não precisa de permissão, RLS desabilitado)
+      const { data, error } = await supabase
+        .from('categorias')
+        .select('*')
+        .order('nome', { ascending: true });
 
       if (error) {
-        console.error("Erro na RPC:", error);
-        setErro("Erro ao carregar permissões: " + error.message);
+        console.error("Erro ao buscar categorias:", error);
+        setErro("Erro ao carregar categorias: " + error.message);
         return;
       }
 
-      console.log("Categorias retornadas pela RPC:", data);
+      console.log("Categorias carregadas:", data);
       setCategorias(data || []);
     } catch (err) {
       console.error("Erro inesperado:", err);
-      setErro("Erro ao carregar permissões: " + err.message);
+      setErro("Erro ao carregar categorias: " + err.message);
     } finally {
       setCarregando(false);
     }
@@ -112,8 +113,8 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
 
         {categorias.length === 0 && (
           <div className="bg-white rounded-2xl p-10 text-center text-gray-500">
-            <p>Nenhuma permissão encontrada para este usuário.</p>
-            <p className="text-sm text-gray-400 mt-2">Entre em contato com o administrador.</p>
+            <p>Nenhuma categoria encontrada.</p>
+            <p className="text-sm text-gray-400 mt-2">Verifique se a tabela categorias tem dados.</p>
           </div>
         )}
       </div>
