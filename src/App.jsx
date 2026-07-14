@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   AlertTriangle, AlertOctagon, PackageX, PackageMinus,
   ArrowLeftRight, Plus, Trash2, Pencil, X, Check,
@@ -10,7 +10,7 @@ import Auth from "./Auth";
 const DIAS_ALERTA_VENCIMENTO = 90;
 const UNIDADES = ["L", "mL", "kg", "g", "un"];
 
-// ===== LOCAIS =====
+// ===== LOCAIS (prateleiras) =====
 const LOCAIS = [
   "Casa de Adubo - Depósito",
   "Casa de Adubo - Balcão",
@@ -35,7 +35,6 @@ const MOTIVOS_SAIDA = [
 // ===== ESTADO INICIAL DO FORMULÁRIO =====
 const vazio = {
   produto_id: "",
-  codigo: "",
   nome: "",
   lote: "",
   validade: "",
@@ -86,13 +85,14 @@ function getStatusInfo(item) {
 }
 
 export default function App() {
-  // ===== SESSÃO =====
+  // ===== SESSÃO E AUTENTICAÇÃO =====
   const [sessao, setSessao] = useState(null);
   const [carregandoSessao, setCarregandoSessao] = useState(true);
 
   // ===== DADOS =====
   const [itens, setItens] = useState([]);
   const [produtos, setProdutos] = useState([]);
+  const [estoqueTotal, setEstoqueTotal] = useState([]); // para exibir total por produto
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -101,9 +101,6 @@ export default function App() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(vazio);
-  const [buscaProduto, setBuscaProduto] = useState("");
-  const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
-  const sugestoesRef = useRef(null);
 
   // ===== FILTROS =====
   const [busca, setBusca] = useState("");
@@ -123,21 +120,11 @@ export default function App() {
   const [qtdTransferir, setQtdTransferir] = useState("");
   const [motivoTransferir, setMotivoTransferir] = useState("");
 
+  // ===== HISTÓRICO =====
   const [mostrarHistorico, setMostrarHistorico] = useState(false);
   const [historico, setHistorico] = useState([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
-
-  // ===== FILTRO DE PRODUTOS PARA SUGESTÕES =====
-  const produtosFiltrados = useMemo(() => {
-    if (!buscaProduto.trim()) return produtos.slice(0, 10);
-    const termo = buscaProduto.toLowerCase().trim();
-    return produtos
-      .filter(p =>
-        p.nome.toLowerCase().includes(termo) ||
-        p.codigo.toLowerCase().includes(termo)
-      )
-      .slice(0, 10);
-  }, [produtos, buscaProduto]);
+  const [filtroHistorico, setFiltroHistorico] = useState('todos'); // 'todos', 'saida', 'transferencia'
 
   // ===== EFETTO DE SESSÃO =====
   useEffect(() => {
@@ -153,11 +140,12 @@ export default function App() {
     return () => listener?.subscription?.unsubscribe();
   }, []);
 
-  // ===== CARREGAR PRODUTOS E ITENS =====
+  // ===== CARREGAR PRODUTOS, ITENS E ESTOQUE TOTAL =====
   useEffect(() => {
     if (sessao) {
       carregarProdutos();
       carregarItens();
+      carregarEstoqueTotal();
     }
   }, [sessao]);
 
@@ -169,7 +157,6 @@ export default function App() {
     if (error) {
       console.error("Erro ao carregar produtos:", error);
     } else {
-      console.log("Produtos carregados:", data?.length);
       setProdutos(data || []);
     }
   }
@@ -185,6 +172,14 @@ export default function App() {
     setCarregando(false);
   }
 
+  async function carregarEstoqueTotal() {
+    const { data, error } = await supabase
+      .from("estoque_total_produto")
+      .select("*")
+      .order("nome", { ascending: true });
+    if (!error) setEstoqueTotal(data || []);
+  }
+
   // ===== LOGOUT =====
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -194,17 +189,12 @@ export default function App() {
   function abrirNovo() {
     setForm({ ...vazio });
     setEditandoId(null);
-    setBuscaProduto("");
     setMostrarForm(true);
-    setMostrarSugestoes(false);
   }
 
   function abrirEdicao(item) {
-    // Buscar o código do produto
-    const produto = produtos.find(p => p.id === item.produto_id);
     setForm({
       produto_id: item.produto_id || "",
-      codigo: produto?.codigo || "",
       nome: item.nome,
       lote: item.lote,
       validade: item.validade,
@@ -213,29 +203,27 @@ export default function App() {
       minimo: String(item.minimo),
       local: item.local || LOCAIS[2],
     });
-    setBuscaProduto(produto ? `${produto.codigo} - ${produto.nome}` : item.nome);
     setEditandoId(item.id);
     setMostrarForm(true);
-    setMostrarSugestoes(false);
   }
 
   function fecharForm() {
     setMostrarForm(false);
     setForm(vazio);
     setEditandoId(null);
-    setBuscaProduto("");
-    setMostrarSugestoes(false);
   }
 
-  function selecionarProduto(produto) {
-    setForm({
-      ...form,
-      produto_id: produto.id,
-      codigo: produto.codigo,
-      nome: produto.nome,
-    });
-    setBuscaProduto(`${produto.codigo} - ${produto.nome}`);
-    setMostrarSugestoes(false);
+  function handleProdutoSelecionado(produtoId) {
+    const produto = produtos.find(p => p.id === produtoId);
+    if (produto) {
+      setForm({
+        ...form,
+        produto_id: produto.id,
+        nome: produto.nome,
+      });
+    } else {
+      setForm({ ...form, produto_id: "", nome: "" });
+    }
   }
 
   async function salvarForm() {
@@ -278,6 +266,7 @@ export default function App() {
     if (error) setErro("Erro ao salvar.");
     else {
       await carregarItens();
+      await carregarEstoqueTotal();
       fecharForm();
     }
     setSalvando(false);
@@ -287,7 +276,10 @@ export default function App() {
     if (!window.confirm("Excluir este item do depósito?")) return;
     const { error } = await supabase.from("itens").delete().eq("id", id);
     if (error) setErro("Erro ao excluir.");
-    else carregarItens();
+    else {
+      await carregarItens();
+      await carregarEstoqueTotal();
+    }
   }
 
   // ===== RETIRADA =====
@@ -357,6 +349,7 @@ export default function App() {
     });
 
     await carregarItens();
+    await carregarEstoqueTotal();
     setSalvando(false);
     fecharRetirar();
   }
@@ -463,15 +456,17 @@ export default function App() {
     });
 
     await carregarItens();
+    await carregarEstoqueTotal();
     setSalvando(false);
     fecharTransferir();
   }
 
   // ===== HISTÓRICO =====
-  async function abrirHistorico() {
+  async function abrirHistorico(filtro = 'todos') {
     setMostrarHistorico(true);
     setCarregandoHistorico(true);
-    const { data, error } = await supabase
+
+    let query = supabase
       .from("movimentacoes")
       .select(`
         *,
@@ -479,6 +474,12 @@ export default function App() {
       `)
       .order("criado_em", { ascending: false })
       .limit(50);
+
+    if (filtro !== 'todos') {
+      query = query.eq('tipo', filtro);
+    }
+
+    const { data, error } = await query;
     if (!error) setHistorico(data || []);
     setCarregandoHistorico(false);
   }
@@ -520,17 +521,6 @@ export default function App() {
     return [...lista].sort((a, b) => a.nome.localeCompare(b.nome));
   }, [itensComStatus, filtroAlerta, filtroLocal, busca]);
 
-  // ===== CLIQUE FORA DAS SUGESTÕES =====
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (sugestoesRef.current && !sugestoesRef.current.contains(event.target)) {
-        setMostrarSugestoes(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   // ===== RENDER =====
   if (carregandoSessao) {
     return (
@@ -566,7 +556,7 @@ export default function App() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={abrirHistorico}
+                onClick={() => abrirHistorico(filtroHistorico)}
                 className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 border border-white/20 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all"
               >
                 <History size={18} /> Histórico
@@ -710,7 +700,27 @@ export default function App() {
           </div>
         )}
 
-        {/* LISTA DE ITENS */}
+        {/* RESUMO DE ESTOQUE TOTAL POR PRODUTO */}
+        {estoqueTotal.length > 0 && (
+          <div className="mb-6 bg-white rounded-2xl border border-gray-200 shadow-md p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">📦 Resumo de Estoque por Produto</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-60 overflow-y-auto">
+              {estoqueTotal.slice(0, 20).map((item) => (
+                <div key={item.produto_id} className="flex justify-between items-center border-b border-gray-100 py-1 px-2 text-sm">
+                  <span className="text-gray-700 truncate">{item.codigo} - {item.nome}</span>
+                  <span className="font-semibold text-green-700">{item.quantidade_total}</span>
+                </div>
+              ))}
+              {estoqueTotal.length > 20 && (
+                <div className="col-span-full text-center text-xs text-gray-400">
+                  + {estoqueTotal.length - 20} produtos
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* LISTA DE ITENS EM GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {carregando ? (
             <div className="col-span-full bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400 text-sm">
@@ -834,56 +844,23 @@ export default function App() {
               </button>
             </div>
             <div className="px-6 py-6 space-y-5 max-h-[75vh] overflow-y-auto">
-              {/* CAMPO DE BUSCA DE PRODUTO COM AUTOCOMPLETE */}
+              {/* SELETOR DE PRODUTO */}
               <div>
                 <label className="text-xs font-medium text-gray-600">
-                  Produto * (busque por nome ou código)
+                  Produto *
                 </label>
-                <div className="relative" ref={sugestoesRef}>
-                  <input
-                    type="text"
-                    value={buscaProduto}
-                    onChange={(e) => {
-                      setBuscaProduto(e.target.value);
-                      setMostrarSugestoes(true);
-                      if (!e.target.value) {
-                        setForm({ ...form, produto_id: "", codigo: "", nome: "" });
-                      }
-                    }}
-                    onFocus={() => setMostrarSugestoes(true)}
-                    placeholder="Digite nome ou código..."
-                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-shadow"
-                  />
-                  {mostrarSugestoes && produtosFiltrados.length > 0 && (
-                    <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto">
-                      {produtosFiltrados.map((p) => (
-                        <li
-                          key={p.id}
-                          onClick={() => selecionarProduto(p)}
-                          className="px-3 py-2 hover:bg-green-50 cursor-pointer text-sm flex items-center gap-2 border-b border-gray-100 last:border-0"
-                        >
-                          <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
-                            {p.codigo}
-                          </span>
-                          <span className="text-gray-800">{p.nome}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {mostrarSugestoes && buscaProduto && produtosFiltrados.length === 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 text-sm text-gray-500">
-                      Nenhum produto encontrado.
-                    </div>
-                  )}
-                </div>
-                {/* Exibir código e nome selecionados */}
-                {form.produto_id && (
-                  <div className="mt-2 flex items-center gap-2 text-xs bg-gray-50 p-2 rounded-lg">
-                    <span className="font-mono text-gray-600">Código: <strong>{form.codigo}</strong></span>
-                    <span className="text-gray-400">|</span>
-                    <span className="text-gray-600">Nome: <strong>{form.nome}</strong></span>
-                  </div>
-                )}
+                <select
+                  value={form.produto_id}
+                  onChange={(e) => handleProdutoSelecionado(e.target.value)}
+                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                >
+                  <option value="">Selecione um produto...</option>
+                  {produtos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.codigo} - {p.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -989,7 +966,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ===== MODAL - RETIRAR (com motivos) ===== */}
+      {/* ===== MODAL - RETIRAR ===== */}
       {mostrarRetirar && itemRetirar && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -1180,7 +1157,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ===== MODAL - HISTÓRICO ===== */}
+      {/* ===== MODAL - HISTÓRICO (com filtro) ===== */}
       {mostrarHistorico && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[80vh] flex flex-col border border-white/20">
@@ -1196,6 +1173,23 @@ export default function App() {
               </button>
             </div>
             <div className="px-6 py-4 overflow-y-auto">
+              {/* Seletor de filtro */}
+              <div className="flex items-center gap-2 mb-3">
+                <label className="text-xs font-medium text-gray-600">Filtrar por:</label>
+                <select
+                  value={filtroHistorico}
+                  onChange={(e) => {
+                    setFiltroHistorico(e.target.value);
+                    abrirHistorico(e.target.value);
+                  }}
+                  className="px-3 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="saida">Saídas (Baixas)</option>
+                  <option value="transferencia">Transferências</option>
+                </select>
+              </div>
+
               {carregandoHistorico ? (
                 <p className="text-sm text-gray-400 text-center py-8">Carregando...</p>
               ) : historico.length === 0 ? (
