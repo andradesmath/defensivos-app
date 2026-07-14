@@ -1,40 +1,6 @@
 import { useState, useEffect } from "react";
-import {
-  Package, LogOut, Layers, ChevronLeft, Sprout, Tractor,
-  Flower2, Waves, Fish, Footprints, Rope, Zap, Box, Shield,
-  Wrench, Leaf, Droplet, Sprinkler, Trees, TreePine, Cog,
-  Store, Spray, Dog, Sack, Saddle, HelpCircle, Seed, Home, Syringe
-} from "lucide-react";
+import { Package, LogOut, Layers, ChevronLeft, Sprout, Tractor } from "lucide-react";
 import { supabase } from "./supabaseClient";
-
-const iconMap = {
-  'ADUBO': Flower2,
-  'BOMBAS': Waves,
-  'CAÇA/PESCA': Fish,
-  'CALÇADOS': Footprints,
-  'CORDAS/LONA': Rope,
-  'DEFENSIVOS': Sprout,
-  'DIVERSOS': Package,
-  'ELÉTRICO': Zap,
-  'EMBALAGENS': Box,
-  'EPI': Shield,
-  'FERRAGENS E FERRAMENTAS': Wrench,
-  'FERTILIZANTES': Leaf,
-  'HIDRAULICA': Droplet,
-  'IRRIGAÇÃO': Sprinkler,
-  'JARDINAGEM': Trees,
-  'MADEIRAS': TreePine,
-  'MAQUINAS': Cog,
-  'PRODUTOS PARA USO LOJA': Store,
-  'PULVERIZADORES': Spray,
-  'RAÇÕES E PET': Dog,
-  'SACARIA': Sack,
-  'SELARIA': Saddle,
-  'SEM GRUPO': HelpCircle,
-  'SEMENTES': Seed,
-  'UTILIDADES DO LAR': Home,
-  'VETERINÁRIO': Syringe,
-};
 
 export default function Dashboard({ sessao, onSelectCategoria }) {
   const [categorias, setCategorias] = useState([]);
@@ -47,40 +13,60 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
 
   async function carregarCategorias() {
     try {
+      console.log("=== INICIANDO CARGA DE CATEGORIAS ===");
+      console.log("Usuário ID:", sessao?.user?.id);
+
+      // Consulta direta à tabela categorias
       const { data, error } = await supabase
         .from('categorias')
         .select('*')
         .order('nome', { ascending: true });
 
+      console.log("Dados retornados:", data);
+      console.log("Erro:", error);
+
       if (error) {
+        console.error("Erro na consulta:", error);
         setErro("Erro ao carregar categorias: " + error.message);
         return;
       }
-      setCategorias(data || []);
+
+      if (!data || data.length === 0) {
+        console.warn("Nenhuma categoria encontrada. A tabela pode estar vazia.");
+        setCategorias([]);
+        return;
+      }
+
+      console.log("Categorias carregadas com sucesso:", data.length);
+      setCategorias(data);
     } catch (err) {
+      console.error("Erro inesperado:", err);
       setErro("Erro ao carregar categorias: " + err.message);
     } finally {
       setCarregando(false);
     }
   }
 
-  const getIcon = (nome) => {
-    const Icon = iconMap[nome] || Layers;
-    return <Icon size={32} className="text-green-700" />;
-  };
-
   async function handleLogout() {
     await supabase.auth.signOut();
   }
 
-  if (carregando) return <div className="min-h-screen flex items-center justify-center bg-amber-50">Carregando...</div>;
+  if (carregando) {
+    return <div className="min-h-screen flex items-center justify-center bg-amber-50">Carregando...</div>;
+  }
+
   if (erro) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-amber-50 p-4">
         <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md text-center">
           <h2 className="text-xl font-bold text-red-600 mb-2">Erro</h2>
           <p className="text-gray-600">{erro}</p>
-          <button onClick={carregarCategorias} className="mt-4 px-4 py-2 bg-green-600 text-white rounded-xl">Tentar novamente</button>
+          <button
+            onClick={carregarCategorias}
+            className="mt-4 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700"
+          >
+            Tentar novamente
+          </button>
         </div>
       </div>
     );
@@ -106,13 +92,17 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={handleLogout} className="flex items-center gap-1.5 bg-red-500/20 text-white hover:bg-red-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10">
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 bg-red-500/20 text-white hover:bg-red-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
+              >
                 <LogOut size={18} /> Sair
               </button>
             </div>
           </div>
         </header>
 
+        {/* Grid de categorias */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {categorias.map((cat) => (
             <button
@@ -122,7 +112,7 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
             >
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-3 bg-green-100 rounded-xl group-hover:bg-green-200 transition-colors">
-                  {getIcon(cat.nome)}
+                  <Layers size={24} className="text-green-700" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-800">{cat.nome}</h3>
               </div>
@@ -137,6 +127,7 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
         {categorias.length === 0 && (
           <div className="bg-white rounded-2xl p-10 text-center text-gray-500">
             <p>Nenhuma categoria encontrada.</p>
+            <p className="text-sm text-gray-400 mt-2">Verifique se a tabela categorias tem dados.</p>
           </div>
         )}
       </div>
