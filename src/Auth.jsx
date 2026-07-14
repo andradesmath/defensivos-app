@@ -7,23 +7,31 @@ export default function Auth({ onLogin }) {
   const [nome, setNome] = useState('');
   const [isRegistro, setIsRegistro] = useState(false);
   const [erro, setErro] = useState('');
+  const [carregando, setCarregando] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErro('');
+    setCarregando(true);
 
-    if (isRegistro) {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password: senha,
-        options: { data: { nome } },
-      });
-      if (error) setErro(error.message);
-      else alert('Cadastro realizado! Verifique seu email para confirmar.');
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-      if (error) setErro(error.message);
-      else onLogin();
+    try {
+      if (isRegistro) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password: senha,
+          options: { data: { nome } },
+        });
+        if (error) throw error;
+        alert('Cadastro realizado! Verifique seu email para confirmar.');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+        if (error) throw error;
+        if (onLogin) onLogin();
+      }
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -63,15 +71,19 @@ export default function Auth({ onLogin }) {
           {erro && <p className="text-red-600 text-sm">{erro}</p>}
           <button
             type="submit"
-            className="w-full bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 rounded-xl transition"
+            disabled={carregando}
+            className="w-full bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 rounded-xl transition disabled:opacity-50"
           >
-            {isRegistro ? 'Cadastrar' : 'Entrar'}
+            {carregando ? 'Carregando...' : (isRegistro ? 'Cadastrar' : 'Entrar')}
           </button>
         </form>
         <p className="text-center text-sm mt-4">
           {isRegistro ? 'Já tem conta?' : 'Não tem conta?'}{' '}
           <button
-            onClick={() => setIsRegistro(!isRegistro)}
+            onClick={() => {
+              setIsRegistro(!isRegistro);
+              setErro('');
+            }}
             className="text-green-700 font-medium hover:underline"
           >
             {isRegistro ? 'Faça login' : 'Cadastre-se'}
