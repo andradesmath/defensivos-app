@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { Package, LogOut, Layers, ChevronLeft, Sprout, Tractor } from "lucide-react";
+import { Package, LogOut, Layers, ChevronLeft, Tractor, AlertTriangle } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
-// Lista de categorias padrão (fallback)
+// Usado apenas como último recurso, se a conexão com o Supabase falhar de verdade
 const CATEGORIAS_PADRAO = [
   { id: '1', nome: 'ADUBO', descricao: 'Adubos e fertilizantes' },
   { id: '2', nome: 'BOMBAS', descricao: 'Bombas e acessórios' },
@@ -35,41 +35,69 @@ const CATEGORIAS_PADRAO = [
 export default function Dashboard({ sessao, onSelectCategoria }) {
   const [categorias, setCategorias] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState("");
+  const [erro, setErro] = useState(null);
+  const [usandoFallback, setUsandoFallback] = useState(false);
+  const [debugInfo, setDebugInfo] = useState(null);
 
   useEffect(() => {
     carregarCategorias();
   }, []);
 
   async function carregarCategorias() {
-    try {
-      console.log("=== BUSCANDO CATEGORIAS DO BANCO ===");
-      const { data, error } = await supabase
-        .from('categorias')
-        .select('*')
-        .order('nome', { ascending: true });
+    setCarregando(true);
+    setErro(null);
+    setUsandoFallback(false);
 
-      console.log("Dados retornados:", data);
-      console.log("Erro:", error);
+    // 1) Confirma se existe sessão ativa ANTES de consultar.
+    // Sem isso, auth.uid() no RLS vem null e a policy nega tudo,
+    // sem gerar erro nenhum — só retorna array vazio.
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
-      if (error) {
-        console.warn("Erro na consulta, usando fallback local.", error);
-        setCategorias(CATEGORIAS_PADRAO);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        setCategorias(data);
-      } else {
-        console.warn("Nenhuma categoria no banco, usando fallback local.");
-        setCategorias(CATEGORIAS_PADRAO);
-      }
-    } catch (err) {
-      console.error("Erro inesperado, usando fallback local:", err);
-      setCategorias(CATEGORIAS_PADRAO);
-    } finally {
+    if (sessionError || !sessionData?.session) {
+      setDebugInfo({
+        motivo: "Sem sessão ativa no Supabase Auth",
+        sessionError: sessionError?.message || null,
+      });
+      setErro("Você não está autenticado (sessão ausente). Faça login novamente.");
       setCarregando(false);
+      return;
     }
+
+    const userId = sessionData.session.user.id;
+
+    // 2) Consulta as categorias normalmente
+    const { data, error } = await supabase
+      .from("categorias")
+      .select("*")
+      .order("nome", { ascending: true });
+
+    if (error) {
+      // Erro real (ex: policy mal formada, coluna inexistente, etc.)
+      setDebugInfo({ userId, supabaseError: error });
+      setErro(`Erro ao consultar categorias: ${error.message}`);
+      setCarregando(false);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      // Consulta funcionou, mas voltou vazia — quase sempre é RLS
+      // negando silenciosamente, e NÃO falta de dado (já confirmamos
+      // que a tabela tem 26 linhas). Mostramos isso claramente,
+      // em vez de trocar pelo fallback sem avisar.
+      setDebugInfo({ userId, aviso: "Consulta OK, porém 0 linhas retornadas — verifique a policy de RLS" });
+      setCategorias([]);
+      setCarregando(false);
+      return;
+    }
+
+    setCategorias(data);
+    setCarregando(false);
+  }
+
+  function usarFallback() {
+    setCategorias(CATEGORIAS_PADRAO);
+    setUsandoFallback(true);
+    setErro(null);
   }
 
   async function handleLogout() {
@@ -77,22 +105,9 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
   }
 
   if (carregando) {
-    return <div className="min-h-screen flex items-center justify-center bg-amber-50">Carregando...</div>;
-  }
-
-  if (erro) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-amber-50 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md text-center">
-          <h2 className="text-xl font-bold text-red-600 mb-2">Erro</h2>
-          <p className="text-gray-600">{erro}</p>
-          <button
-            onClick={carregarCategorias}
-            className="mt-4 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700"
-          >
-            Tentar novamente
-          </button>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-amber-50">
+        Carregando...
       </div>
     );
   }
@@ -127,26 +142,93 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {categorias.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => onSelectCategoria(cat)}
-              className="bg-white rounded-2xl border-2 border-gray-200 shadow-md hover:shadow-xl hover:border-green-400 transition-all p-6 text-left group hover:-translate-y-1"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-3 bg-green-100 rounded-xl group-hover:bg-green-200 transition-colors">
-                  <Layers size={24} className="text-green-700" />
+        {/* Erro real (sessão ausente ou erro do Supabase) */}
+        {erro && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-5 mb-6 flex gap-3">
+            <AlertTriangle className="text-red-500 flex-shrink-0" size={22} />
+            <div className="flex-1">
+              <p className="font-semibold text-red-700">{erro}</p>
+              {debugInfo && (
+                <pre className="text-xs text-red-500 mt-2 whitespace-pre-wrap break-all">
+                  {JSON.stringify(debugInfo, null, 2)}
+                </pre>
+              )}
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={carregarCategorias}
+                  className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+                >
+                  Tentar novamente
+                </button>
+                <button
+                  onClick={usarFallback}
+                  className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300"
+                >
+                  Usar lista local (modo offline)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Consulta OK mas vazia (RLS bloqueando) */}
+        {!erro && categorias.length === 0 && (
+          <div className="bg-white rounded-2xl shadow-md p-8 text-center">
+            <p className="font-semibold text-gray-700">Nenhuma categoria retornada pelo banco.</p>
+            <p className="text-sm text-gray-500 mt-1">
+              A consulta funcionou, mas voltou vazia — isso normalmente é o RLS (Row Level Security)
+              bloqueando o seu usuário. Confira a policy de SELECT na tabela <code>categorias</code>.
+            </p>
+            {debugInfo && (
+              <pre className="text-xs text-gray-400 mt-3 whitespace-pre-wrap break-all text-left bg-gray-50 p-3 rounded-lg">
+                {JSON.stringify(debugInfo, null, 2)}
+              </pre>
+            )}
+            <div className="flex gap-2 justify-center mt-4">
+              <button
+                onClick={carregarCategorias}
+                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+              >
+                Tentar novamente
+              </button>
+              <button
+                onClick={usarFallback}
+                className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300"
+              >
+                Usar lista local (modo offline)
+              </button>
+            </div>
+          </div>
+        )}
+
+        {usandoFallback && categorias.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-xl px-4 py-2 mb-4">
+            Exibindo lista local — os dados podem estar desatualizados em relação ao banco.
+          </div>
+        )}
+
+        {categorias.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {categorias.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => onSelectCategoria(cat)}
+                className="bg-white rounded-2xl border-2 border-gray-200 shadow-md hover:shadow-xl hover:border-green-400 transition-all p-6 text-left group hover:-translate-y-1"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-3 bg-green-100 rounded-xl group-hover:bg-green-200 transition-colors">
+                    <Layers size={24} className="text-green-700" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-800">{cat.nome}</h3>
                 </div>
-                <h3 className="text-lg font-bold text-gray-800">{cat.nome}</h3>
-              </div>
-              <p className="text-sm text-gray-500">{cat.descricao || "Gerenciar estoque"}</p>
-              <div className="mt-3 text-xs text-green-600 font-medium flex items-center gap-1">
-                Acessar <ChevronLeft size={14} className="rotate-180" />
-              </div>
-            </button>
-          ))}
-        </div>
+                <p className="text-sm text-gray-500">{cat.descricao || "Gerenciar estoque"}</p>
+                <div className="mt-3 text-xs text-green-600 font-medium flex items-center gap-1">
+                  Acessar <ChevronLeft size={14} className="rotate-180" />
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
