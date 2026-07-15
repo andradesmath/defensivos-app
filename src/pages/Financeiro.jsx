@@ -6,7 +6,7 @@ import FinanceiroDashboard from '../FinanceiroDashboard'; // seu componente com 
 import { ChartColumn, FileSpreadsheet, LayoutDashboard, Users, ArrowLeft } from 'lucide-react';
 
 export default function Financeiro({ onVoltar }) {
-  const [aba, setAba] = useState('dashboard'); // padrão: dashboard
+  const [aba, setAba] = useState('dashboard');
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-8">
@@ -71,7 +71,7 @@ export default function Financeiro({ onVoltar }) {
           </button>
         </div>
 
-        {aba === 'dashboard' && <FinanceiroDashboard />}
+        {aba === 'dashboard' && <FinanceiroDashboard onVoltar={onVoltar} />}
         {aba === 'vendas' && <VendasForm />}
         {aba === 'contas' && <ContasForm />}
         {aba === 'vendedores' && <VendedoresDashboard />}
