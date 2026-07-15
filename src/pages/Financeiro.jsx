@@ -2,7 +2,7 @@ import { useState } from 'react';
 import VendasForm from '../components/financeiro/VendasForm';
 import ContasForm from '../components/financeiro/ContasForm';
 import VendedoresDashboard from '../components/financeiro/VendedoresDashboard';
-import FinanceiroDashboard from '../FinanceiroDashboard'; // seu componente com gráficos
+import FinanceiroDashboard from '../FinanceiroDashboard';
 import { ChartColumn, FileSpreadsheet, LayoutDashboard, Users, ArrowLeft } from 'lucide-react';
 
 export default function Financeiro({ onVoltar }) {

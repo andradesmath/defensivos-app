@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import Auth from "./Auth";
 import Dashboard from "./Dashboard";
+import Estoque from "./Estoque";
 import Setor from "./Setor";
 import Financeiro from "./pages/Financeiro";
 
 export default function App() {
   const [sessao, setSessao] = useState(null);
   const [carregando, setCarregando] = useState(true);
-  const [tela, setTela] = useState('dashboard'); // 'dashboard', 'setor', 'financeiro'
+  const [tela, setTela] = useState('dashboard'); // 'dashboard', 'estoque', 'setor', 'financeiro'
   const [categoriaAtiva, setCategoriaAtiva] = useState(null);
 
   useEffect(() => {
@@ -29,6 +30,10 @@ export default function App() {
     setTela('setor');
   }
 
+  function irParaEstoque() {
+    setTela('estoque');
+  }
+
   function irParaFinanceiro() {
     setTela('financeiro');
   }
@@ -45,10 +50,14 @@ export default function App() {
     return (
       <Dashboard
         sessao={sessao}
-        onSelectCategoria={irParaSetor}
+        onOpenEstoque={irParaEstoque}
         onOpenFinanceiro={irParaFinanceiro}
       />
     );
+  }
+
+  if (tela === 'estoque') {
+    return <Estoque sessao={sessao} onSelectCategoria={irParaSetor} onVoltar={voltarDashboard} />;
   }
 
   if (tela === 'setor' && categoriaAtiva) {
@@ -59,5 +68,5 @@ export default function App() {
     return <Financeiro onVoltar={voltarDashboard} />;
   }
 
-  return <Dashboard sessao={sessao} onSelectCategoria={irParaSetor} onOpenFinanceiro={irParaFinanceiro} />;
+  return <Dashboard sessao={sessao} onOpenEstoque={irParaEstoque} onOpenFinanceiro={irParaFinanceiro} />;
 }
