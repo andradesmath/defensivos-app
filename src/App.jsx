@@ -3,12 +3,12 @@ import { supabase } from "./supabaseClient";
 import Auth from "./Auth";
 import Dashboard from "./Dashboard";
 import Setor from "./Setor";
-import Financeiro from "./pages/Financeiro"; // <-- importe a página financeiro
+import Financeiro from "./pages/Financeiro";
 
 export default function App() {
   const [sessao, setSessao] = useState(null);
   const [carregando, setCarregando] = useState(true);
-  const [tela, setTela] = useState('dashboard');
+  const [tela, setTela] = useState('dashboard'); // 'dashboard', 'setor', 'financeiro'
   const [categoriaAtiva, setCategoriaAtiva] = useState(null);
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export default function App() {
       <Dashboard
         sessao={sessao}
         onSelectCategoria={irParaSetor}
-        onOpenFinanceiro={irParaFinanceiro}  // <-- passe a função
+        onOpenFinanceiro={irParaFinanceiro}
       />
     );
   }
