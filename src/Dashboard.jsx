@@ -32,7 +32,7 @@ const CATEGORIAS_PADRAO = [
   { id: '26', nome: 'VETERINÁRIO', descricao: 'Produtos veterinários' },
 ];
 
-export default function Dashboard({ sessao, onSelectCategoria }) {
+export default function Dashboard({ sessao, onSelectCategoria, onOpenFinanceiro }) {
   const [categorias, setCategorias] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
@@ -49,8 +49,6 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
     setUsandoFallback(false);
 
     // 1) Confirma se existe sessão ativa ANTES de consultar.
-    // Sem isso, auth.uid() no RLS vem null e a policy nega tudo,
-    // sem gerar erro nenhum — só retorna array vazio.
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError || !sessionData?.session) {
@@ -72,7 +70,6 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
       .order("nome", { ascending: true });
 
     if (error) {
-      // Erro real (ex: policy mal formada, coluna inexistente, etc.)
       setDebugInfo({ userId, supabaseError: error });
       setErro(`Erro ao consultar categorias: ${error.message}`);
       setCarregando(false);
@@ -80,10 +77,6 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
     }
 
     if (!data || data.length === 0) {
-      // Consulta funcionou, mas voltou vazia — quase sempre é RLS
-      // negando silenciosamente, e NÃO falta de dado (já confirmamos
-      // que a tabela tem 26 linhas). Mostramos isso claramente,
-      // em vez de trocar pelo fallback sem avisar.
       setDebugInfo({ userId, aviso: "Consulta OK, porém 0 linhas retornadas — verifique a policy de RLS" });
       setCategorias([]);
       setCarregando(false);
@@ -132,6 +125,13 @@ export default function Dashboard({ sessao, onSelectCategoria }) {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Botão Financeiro */}
+              <button
+                onClick={onOpenFinanceiro}
+                className="flex items-center gap-1.5 bg-blue-500/20 text-white hover:bg-blue-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
+              >
+                <span>💰</span> Financeiro
+              </button>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1.5 bg-red-500/20 text-white hover:bg-red-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"

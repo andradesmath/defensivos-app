@@ -3,6 +3,7 @@ import { supabase } from "./supabaseClient";
 import Auth from "./Auth";
 import Dashboard from "./Dashboard";
 import Setor from "./Setor";
+import Financeiro from "./pages/Financeiro"; // <-- importe a página financeiro
 
 export default function App() {
   const [sessao, setSessao] = useState(null);
@@ -28,6 +29,10 @@ export default function App() {
     setTela('setor');
   }
 
+  function irParaFinanceiro() {
+    setTela('financeiro');
+  }
+
   function voltarDashboard() {
     setTela('dashboard');
     setCategoriaAtiva(null);
@@ -37,12 +42,22 @@ export default function App() {
   if (!sessao) return <Auth onLogin={() => {}} />;
 
   if (tela === 'dashboard') {
-    return <Dashboard sessao={sessao} onSelectCategoria={irParaSetor} />;
+    return (
+      <Dashboard
+        sessao={sessao}
+        onSelectCategoria={irParaSetor}
+        onOpenFinanceiro={irParaFinanceiro}  // <-- passe a função
+      />
+    );
   }
 
   if (tela === 'setor' && categoriaAtiva) {
     return <Setor sessao={sessao} categoria={categoriaAtiva} onVoltar={voltarDashboard} />;
   }
 
-  return <Dashboard sessao={sessao} onSelectCategoria={irParaSetor} />;
+  if (tela === 'financeiro') {
+    return <Financeiro onVoltar={voltarDashboard} />;
+  }
+
+  return <Dashboard sessao={sessao} onSelectCategoria={irParaSetor} onOpenFinanceiro={irParaFinanceiro} />;
 }
