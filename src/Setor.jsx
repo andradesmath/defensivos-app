@@ -93,6 +93,7 @@ export default function Setor({ sessao, categoria, onVoltar }) {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(vazio);
+  const [termoBusca, setTermoBusca] = useState(""); // Estado para o texto digitado no campo de busca
 
   const [busca, setBusca] = useState("");
   const [filtroAlerta, setFiltroAlerta] = useState("todos");
@@ -197,15 +198,17 @@ export default function Setor({ sessao, categoria, onVoltar }) {
   }
 
   // ============================================================
-  // FORMULÁRIO
+  // FORMULÁRIO – com busca de produtos
   // ============================================================
   function abrirNovo() {
     setForm({ ...vazio });
     setEditandoId(null);
+    setTermoBusca("");
     setMostrarForm(true);
   }
 
   function abrirEdicao(item) {
+    const produto = produtos.find(p => p.id === item.produto_id);
     setForm({
       produto_id: item.produto_id || "",
       nome: item.nome,
@@ -216,6 +219,7 @@ export default function Setor({ sessao, categoria, onVoltar }) {
       minimo: String(item.minimo),
       local: item.local || LOCAIS[2],
     });
+    setTermoBusca(produto ? `${produto.codigo} - ${produto.nome}` : item.nome);
     setEditandoId(item.id);
     setMostrarForm(true);
   }
@@ -224,20 +228,37 @@ export default function Setor({ sessao, categoria, onVoltar }) {
     setMostrarForm(false);
     setForm(vazio);
     setEditandoId(null);
+    setTermoBusca("");
     setEstoquePorLocal([]);
     setTotalProduto(0);
   }
 
-  function handleProdutoSelecionado(produtoId) {
-    const produto = produtos.find(p => p.id === produtoId);
-    if (produto) {
+  // Função para lidar com a mudança no campo de busca de produtos
+  function handleProdutoBusca(texto) {
+    setTermoBusca(texto);
+
+    // Se o texto estiver vazio, limpa a seleção
+    if (!texto.trim()) {
+      setForm({ ...form, produto_id: "", nome: "" });
+      return;
+    }
+
+    // Tenta encontrar um produto que corresponda ao texto (case insensitive)
+    const encontrado = produtos.find(p =>
+      p.nome.toLowerCase().includes(texto.toLowerCase()) ||
+      p.codigo.toLowerCase().includes(texto.toLowerCase())
+    );
+
+    if (encontrado) {
+      // Se encontrou, preenche o formulário com os dados do produto
       setForm({
         ...form,
-        produto_id: produto.id,
-        nome: produto.nome,
+        produto_id: encontrado.id,
+        nome: encontrado.nome,
       });
     } else {
-      setForm({ ...form, produto_id: "", nome: "" });
+      // Se não encontrou, mantém o texto digitado, mas zera o produto_id
+      setForm({ ...form, produto_id: "", nome: texto });
     }
   }
 
@@ -786,7 +807,7 @@ export default function Setor({ sessao, categoria, onVoltar }) {
 
       {/* ===== MODAIS ===== */}
 
-      {/* MODAL FORMULÁRIO */}
+      {/* MODAL FORMULÁRIO – com busca de produtos via datalist */}
       {mostrarForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -795,19 +816,28 @@ export default function Setor({ sessao, categoria, onVoltar }) {
               <button onClick={fecharForm} className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"><X size={20} /></button>
             </div>
             <div className="px-6 py-6 space-y-5 max-h-[75vh] overflow-y-auto">
+              {/* CAMPO PRODUTO COM BUSCA */}
               <div>
                 <label className="text-xs font-medium text-gray-600">Produto *</label>
-                <select
-                  value={form.produto_id}
-                  onChange={(e) => handleProdutoSelecionado(e.target.value)}
-                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                >
-                  <option value="">Selecione um produto...</option>
+                <input
+                  type="text"
+                  list="produtos-list"
+                  value={termoBusca}
+                  onChange={(e) => handleProdutoBusca(e.target.value)}
+                  placeholder="Digite o nome ou código do produto..."
+                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-shadow"
+                />
+                <datalist id="produtos-list">
                   {produtos.map((p) => (
-                    <option key={p.id} value={p.id}>{p.codigo} - {p.nome}</option>
+                    <option key={p.id} value={`${p.codigo} - ${p.nome}`} />
                   ))}
-                </select>
+                </datalist>
+                {form.produto_id && form.nome && (
+                  <p className="text-xs text-green-600 mt-1">✅ Produto selecionado: {form.nome}</p>
+                )}
               </div>
+
+              {/* RESUMO DE QUANTIDADES POR LOCAL (quando produto selecionado) */}
               {form.produto_id && (
                 <div className="bg-green-50 rounded-xl p-3 border border-green-200">
                   <p className="text-xs font-medium text-green-700 mb-1">📦 Quantidade atual por local:</p>
@@ -829,6 +859,7 @@ export default function Setor({ sessao, categoria, onVoltar }) {
                   </div>
                 </div>
               )}
+
               <div>
                 <label className="text-xs font-medium text-gray-600">Local de armazenamento *</label>
                 <select
