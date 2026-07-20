@@ -16,7 +16,6 @@ export default function MinimosProdutos({ onVoltar }) {
     carregarCategorias();
   }, []);
 
-  // Quando a categoria mudar, carregar os produtos
   useEffect(() => {
     if (filtroCategoria !== "") {
       carregarProdutos();
@@ -39,6 +38,9 @@ export default function MinimosProdutos({ onVoltar }) {
     setProdutos([]);
 
     try {
+      console.log("=== CARREGANDO PRODUTOS ===");
+      console.log("Filtro categoria:", filtroCategoria);
+
       // 1. Buscar produtos da categoria selecionada
       let query = supabase.from("produtos").select(`
         id,
@@ -57,6 +59,9 @@ export default function MinimosProdutos({ onVoltar }) {
 
       if (prodsError) throw prodsError;
 
+      console.log("Produtos encontrados:", prods?.length || 0);
+      console.log("Primeiro produto:", prods?.[0]);
+
       if (!prods || prods.length === 0) {
         setProdutos([]);
         setCarregando(false);
@@ -65,6 +70,8 @@ export default function MinimosProdutos({ onVoltar }) {
 
       // 2. Buscar todos os itens de estoque (uma única consulta)
       const produtoIds = prods.map(p => p.id);
+      console.log("IDs dos produtos:", produtoIds);
+
       const { data: itens, error: itensError } = await supabase
         .from("itens")
         .select("produto_id, quantidade")
@@ -74,6 +81,8 @@ export default function MinimosProdutos({ onVoltar }) {
         console.warn("Erro ao buscar itens:", itensError);
       }
 
+      console.log("Itens encontrados:", itens?.length || 0);
+
       // 3. Calcular o total por produto
       const totais = {};
       if (itens) {
@@ -82,6 +91,7 @@ export default function MinimosProdutos({ onVoltar }) {
           totais[id] = (totais[id] || 0) + (item.quantidade || 0);
         });
       }
+      console.log("Totais calculados:", totais);
 
       // 4. Montar a lista final com os totais
       const produtosComEstoque = prods.map(prod => ({
@@ -90,8 +100,12 @@ export default function MinimosProdutos({ onVoltar }) {
         categoria: prod.categorias?.nome || "Sem categoria",
       }));
 
+      console.log("Produtos com estoque:", produtosComEstoque.length);
+      console.log("Primeiro com estoque:", produtosComEstoque[0]);
+
       setProdutos(produtosComEstoque);
     } catch (err) {
+      console.error("Erro no carregamento:", err);
       setErro(err.message);
     } finally {
       setCarregando(false);
@@ -260,10 +274,10 @@ export default function MinimosProdutos({ onVoltar }) {
                     return (
                       <tr key={prod.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {prod.codigo}
+                          {prod.codigo || "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {prod.nome}
+                          {prod.nome || "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">
                           {total}
