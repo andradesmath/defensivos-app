@@ -32,7 +32,7 @@ const CATEGORIAS_PADRAO = [
   { id: '26', nome: 'VETERINÁRIO', descricao: 'Produtos veterinários' },
 ];
 
-export default function Dashboard({ sessao, onSelectCategoria, onOpenLogs, onOpenCadastroProduto }) {
+export default function Dashboard({ sessao, onSelectCategoria, onOpenLogs, onOpenCadastroProduto, onOpenMinimos }) {
   const [categorias, setCategorias] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
@@ -114,17 +114,24 @@ export default function Dashboard({ sessao, onSelectCategoria, onOpenLogs, onOpe
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Botão Mínimos */}
+              <button
+                onClick={onOpenMinimos}
+                className="flex items-center gap-1.5 bg-blue-500/20 text-white hover:bg-blue-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
+              >
+                <Package size={18} /> Mínimos
+              </button>
               {/* Botão Novo Produto */}
               <button
                 onClick={onOpenCadastroProduto}
-                className="flex items-center gap-1.5 bg-blue-500/20 text-white hover:bg-blue-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
+                className="flex items-center gap-1.5 bg-purple-500/20 text-white hover:bg-purple-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
               >
                 <Package size={18} /> Novo Produto
               </button>
               {/* Botão Logs de Exclusão */}
               <button
                 onClick={onOpenLogs}
-                className="flex items-center gap-1.5 bg-purple-500/20 text-white hover:bg-purple-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
+                className="flex items-center gap-1.5 bg-orange-500/20 text-white hover:bg-orange-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
               >
                 <FileText size={18} /> Logs
               </button>
