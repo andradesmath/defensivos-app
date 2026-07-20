@@ -6,6 +6,7 @@ import Setor from "./Setor";
 import LogsExclusao from "./pages/LogsExclusao";
 import CadastroProduto from "./pages/CadastroProduto";
 import MinimosProdutos from "./pages/MinimosProdutos";
+import LogsAcoes from "./pages/LogsAcoes"; // Nova página de logs de ações
 
 export default function App() {
   const [sessao, setSessao] = useState(null);
@@ -36,8 +37,8 @@ export default function App() {
     setCategoriaAtiva(null);
   }
 
-  function abrirLogs() {
-    setTela("logs");
+  function abrirLogsExclusao() {
+    setTela("logsExclusao");
   }
 
   function abrirCadastroProduto() {
@@ -46,6 +47,10 @@ export default function App() {
 
   function abrirMinimos() {
     setTela("minimos");
+  }
+
+  function abrirLogsAcoes() {
+    setTela("logsAcoes");
   }
 
   if (carregando) {
@@ -61,9 +66,10 @@ export default function App() {
       <Dashboard
         sessao={sessao}
         onSelectCategoria={irParaSetor}
-        onOpenLogs={abrirLogs}
+        onOpenLogsExclusao={abrirLogsExclusao}
         onOpenCadastroProduto={abrirCadastroProduto}
         onOpenMinimos={abrirMinimos}
+        onOpenLogsAcoes={abrirLogsAcoes}
       />
     );
   }
@@ -76,11 +82,12 @@ export default function App() {
         onVoltar={voltarDashboard}
         onOpenCadastroProduto={abrirCadastroProduto}
         onOpenMinimos={abrirMinimos}
+        onOpenLogsAcoes={abrirLogsAcoes}
       />
     );
   }
 
-  if (tela === "logs") {
+  if (tela === "logsExclusao") {
     return <LogsExclusao onVoltar={voltarDashboard} />;
   }
 
@@ -92,13 +99,18 @@ export default function App() {
     return <MinimosProdutos onVoltar={voltarDashboard} />;
   }
 
+  if (tela === "logsAcoes") {
+    return <LogsAcoes onVoltar={voltarDashboard} />;
+  }
+
   return (
     <Dashboard
       sessao={sessao}
       onSelectCategoria={irParaSetor}
-      onOpenLogs={abrirLogs}
+      onOpenLogsExclusao={abrirLogsExclusao}
       onOpenCadastroProduto={abrirCadastroProduto}
       onOpenMinimos={abrirMinimos}
+      onOpenLogsAcoes={abrirLogsAcoes}
     />
   );
 }
