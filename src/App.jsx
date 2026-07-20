@@ -4,11 +4,12 @@ import Auth from "./Auth";
 import Dashboard from "./Dashboard";
 import Setor from "./Setor";
 import LogsExclusao from "./pages/LogsExclusao";
+import CadastroProduto from "./pages/CadastroProduto";
 
 export default function App() {
   const [sessao, setSessao] = useState(null);
   const [carregando, setCarregando] = useState(true);
-  const [tela, setTela] = useState('dashboard');
+  const [tela, setTela] = useState("dashboard");
   const [categoriaAtiva, setCategoriaAtiva] = useState(null);
 
   useEffect(() => {
@@ -26,16 +27,20 @@ export default function App() {
 
   function irParaSetor(categoria) {
     setCategoriaAtiva(categoria);
-    setTela('setor');
+    setTela("setor");
   }
 
   function voltarDashboard() {
-    setTela('dashboard');
+    setTela("dashboard");
     setCategoriaAtiva(null);
   }
 
   function abrirLogs() {
-    setTela('logs');
+    setTela("logs");
+  }
+
+  function abrirCadastroProduto() {
+    setTela("cadastroProduto");
   }
 
   if (carregando) {
@@ -46,28 +51,34 @@ export default function App() {
     return <Auth onLogin={() => {}} />;
   }
 
-  if (tela === 'dashboard') {
+  if (tela === "dashboard") {
     return (
       <Dashboard
         sessao={sessao}
         onSelectCategoria={irParaSetor}
         onOpenLogs={abrirLogs}
+        onOpenCadastroProduto={abrirCadastroProduto}
       />
     );
   }
 
-  if (tela === 'setor' && categoriaAtiva) {
+  if (tela === "setor" && categoriaAtiva) {
     return (
       <Setor
         sessao={sessao}
         categoria={categoriaAtiva}
         onVoltar={voltarDashboard}
+        onOpenCadastroProduto={abrirCadastroProduto}
       />
     );
   }
 
-  if (tela === 'logs') {
+  if (tela === "logs") {
     return <LogsExclusao onVoltar={voltarDashboard} />;
+  }
+
+  if (tela === "cadastroProduto") {
+    return <CadastroProduto onVoltar={voltarDashboard} />;
   }
 
   return (
@@ -75,6 +86,7 @@ export default function App() {
       sessao={sessao}
       onSelectCategoria={irParaSetor}
       onOpenLogs={abrirLogs}
+      onOpenCadastroProduto={abrirCadastroProduto}
     />
   );
 }
