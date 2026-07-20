@@ -263,60 +263,39 @@ export default function Setor({ sessao, categoria, onVoltar }) {
   }
 
   async function salvarForm() {
-    if (
-      !form.produto_id ||
-      !form.lote.trim() ||
-      !form.validade ||
-      form.quantidade === "" ||
-      form.minimo === "" ||
-      !form.local
-    ) {
-      setErro("Preencha todos os campos obrigatórios.");
-      return;
-    }
-    setSalvando(true);
-    setErro("");
-    const dados = {
-      produto_id: form.produto_id,
-      nome: form.nome.trim(),
-      lote: form.lote.trim(),
-      validade: form.validade,
-      quantidade: parseFloat(form.quantidade),
-      unidade: form.unidade,
-      minimo: parseFloat(form.minimo),
-      local: form.local,
-      updated_by: sessao.user.id,
-    };
-    let error;
-    if (editandoId) {
-      const { error: e } = await supabase
-        .from("itens")
-        .update(dados)
-        .eq("id", editandoId);
-      error = e;
-    } else {
-      dados.created_by = sessao.user.id;
-      const { error: e } = await supabase.from("itens").insert(dados);
-      error = e;
-    }
-    if (error) setErro("Erro ao salvar.");
-    else {
-      await carregarItens();
-      await carregarEstoqueTotal();
-      fecharForm();
-    }
-    setSalvando(false);
+  // Log para depuração
+  console.log("Valores do formulário:", form);
+
+  // Validação específica
+  if (!form.produto_id) {
+    setErro("Selecione um produto válido da lista.");
+    return;
+  }
+  if (!form.lote.trim()) {
+    setErro("Informe o lote.");
+    return;
+  }
+  if (!form.validade) {
+    setErro("Informe a data de validade.");
+    return;
+  }
+  if (form.quantidade === "" || isNaN(form.quantidade) || parseFloat(form.quantidade) <= 0) {
+    setErro("Informe uma quantidade válida (maior que zero).");
+    return;
+  }
+  if (form.minimo === "" || isNaN(form.minimo) || parseFloat(form.minimo) <= 0) {
+    setErro("Informe um estoque mínimo válido (maior que zero).");
+    return;
+  }
+  if (!form.local) {
+    setErro("Selecione o local de armazenamento.");
+    return;
   }
 
-  async function excluir(id) {
-    if (!window.confirm("Excluir este item do depósito?")) return;
-    const { error } = await supabase.from("itens").delete().eq("id", id);
-    if (error) setErro("Erro ao excluir.");
-    else {
-      await carregarItens();
-      await carregarEstoqueTotal();
-    }
-  }
+  setSalvando(true);
+  setErro("");
+  // ... resto do código
+}
 
   // ============================================================
   // RETIRADA
