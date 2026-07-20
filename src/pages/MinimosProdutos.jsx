@@ -4,72 +4,93 @@ import { supabase } from "../supabaseClient";
 
 export default function MinimosProdutos({ onVoltar }) {
   const [produtos, setProdutos] = useState([]);
-  const [carregando, setCarregando] = useState(true);
+  const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState(false);
-  const [filtroCategoria, setFiltroCategoria] = useState("");
-  const [categorias, setCategorias] = useState([]);
 
+  const [categorias, setCategorias] = useState([]);
+  const [filtroCategoria, setFiltroCategoria] = useState("");
+
+  // Carregar categorias uma vez
   useEffect(() => {
-    carregarDados();
+    carregarCategorias();
   }, []);
 
-  async function carregarDados() {
+  // Quando a categoria mudar, carregar os produtos
+  useEffect(() => {
+    if (filtroCategoria !== "") {
+      carregarProdutosPorCategoria(filtroCategoria);
+    } else {
+      setProdutos([]);
+    }
+  }, [filtroCategoria]);
+
+  async function carregarCategorias() {
+    const { data, error } = await supabase
+      .from("categorias")
+      .select("id, nome")
+      .order("nome");
+    if (!error) setCategorias(data || []);
+  }
+
+  async function carregarProdutosPorCategoria(categoriaNome) {
     setCarregando(true);
     setErro("");
+    setProdutos([]);
+
     try {
-      // Buscar categorias
-      const { data: cats, error: catsError } = await supabase
-        .from("categorias")
-        .select("id, nome")
-        .order("nome");
-      if (catsError) throw catsError;
-      setCategorias(cats || []);
+      let query = supabase.from("produtos").select(`
+        id,
+        codigo,
+        nome,
+        minimo_global,
+        categorias (nome)
+      `);
 
-      // Opção 1: usar a view (mais eficiente)
-      const { data: prods, error: prodsError } = await supabase
-        .from("estoque_total_produto")
-        .select("*")
-        .order("nome");
-
-      if (prodsError) {
-        // Fallback: se a view não existir, busca manualmente
-        console.warn("View não encontrada, buscando manualmente...");
-        const { data: allProds, error: allError } = await supabase
-          .from("produtos")
-          .select(`
-            id,
-            codigo,
-            nome,
-            minimo_global,
-            categorias (nome)
-          `)
-          .order("nome");
-
-        if (allError) throw allError;
-
-        const produtosComEstoque = await Promise.all(
-          (allProds || []).map(async (prod) => {
-            const { data: somaData } = await supabase
-              .from("itens")
-              .select("quantidade")
-              .eq("produto_id", prod.id);
-            const total = somaData?.reduce((acc, item) => acc + (item.quantidade || 0), 0) || 0;
-            return {
-              produto_id: prod.id,
-              codigo: prod.codigo,
-              nome: prod.nome,
-              categoria: prod.categorias?.nome || "Sem categoria",
-              minimo_global: prod.minimo_global || 0,
-              quantidade_total: total,
-            };
-          })
-        );
-        setProdutos(produtosComEstoque);
-      } else {
-        setProdutos(prods || []);
+      if (categoriaNome !== "TODAS") {
+        query = query.eq("categorias.nome", categoriaNome);
       }
+
+      const { data: prods, error: prodsError } = await query.order("nome");
+
+      if (prodsError) throw prodsError;
+
+      // Se não houver produtos, retorna vazio
+      if (!prods || prods.length === 0) {
+        setProdutos([]);
+        setCarregando(false);
+        return;
+      }
+
+      // Para cada produto, calcular a soma do estoque
+      const produtosComEstoque = await Promise.all(
+        prods.map(async (prod) => {
+          const { data: itens, error: itensError } = await supabase
+            .from("itens")
+            .select("quantidade")
+            .eq("produto_id", prod.id);
+
+          if (itensError) {
+            console.warn(`Erro ao buscar itens para ${prod.nome}:`, itensError);
+            return {
+              ...prod,
+              quantidade_total: 0,
+              categoria: prod.categorias?.nome || "Sem categoria",
+            };
+          }
+
+          const total = itens?.reduce((acc, item) => acc + (item.quantidade || 0), 0) || 0;
+
+          return {
+            ...prod,
+            quantidade_total: total,
+            categoria: prod.categorias?.nome || "Sem categoria",
+          };
+        })
+      );
+
+      setProdutos(produtosComEstoque);
     } catch (err) {
       setErro(err.message);
     } finally {
@@ -80,7 +101,7 @@ export default function MinimosProdutos({ onVoltar }) {
   function handleMinimoChange(produtoId, novoValor) {
     setProdutos(prev =>
       prev.map(p =>
-        p.produto_id === produtoId
+        p.id === produtoId
           ? { ...p, minimo_global: parseFloat(novoValor) || 0 }
           : p
       )
@@ -94,7 +115,7 @@ export default function MinimosProdutos({ onVoltar }) {
 
     try {
       const updates = produtos.map(p => ({
-        id: p.produto_id,
+        id: p.id,
         minimo_global: p.minimo_global,
       }));
 
@@ -113,14 +134,40 @@ export default function MinimosProdutos({ onVoltar }) {
     }
   }
 
-  const produtosFiltrados = filtroCategoria
-    ? produtos.filter(p => p.categoria === filtroCategoria)
-    : produtos;
-
-  if (carregando) {
+  // Se nenhuma categoria selecionada, mostrar mensagem
+  if (!filtroCategoria) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-amber-50">
-        Carregando...
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-green-50 p-4 sm:p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <button
+              onClick={onVoltar}
+              className="bg-white p-2 rounded-xl shadow-md hover:shadow-lg transition border border-gray-200"
+            >
+              <ArrowLeft size={20} className="text-gray-600" />
+            </button>
+            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              <Package size={28} className="text-blue-600" />
+              Mínimos de Estoque
+            </h1>
+          </div>
+          <div className="bg-white rounded-2xl shadow-xl p-8 text-center border border-gray-100">
+            <p className="text-gray-500">Selecione uma categoria para visualizar os produtos.</p>
+            <div className="mt-4">
+              <select
+                value={filtroCategoria}
+                onChange={(e) => setFiltroCategoria(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">Selecione uma categoria...</option>
+                <option value="TODAS">Todas as categorias</option>
+                {categorias.map(c => (
+                  <option key={c.id} value={c.nome}>{c.nome}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -147,14 +194,14 @@ export default function MinimosProdutos({ onVoltar }) {
               onChange={(e) => setFiltroCategoria(e.target.value)}
               className="px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              <option value="">Todas as categorias</option>
+              <option value="TODAS">Todas as categorias</option>
               {categorias.map(c => (
                 <option key={c.id} value={c.nome}>{c.nome}</option>
               ))}
             </select>
             <button
               onClick={salvarMinimos}
-              disabled={salvando}
+              disabled={salvando || carregando}
               className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-semibold px-4 py-2 rounded-xl shadow-md transition disabled:opacity-60"
             >
               <Save size={18} />
@@ -176,45 +223,45 @@ export default function MinimosProdutos({ onVoltar }) {
 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Código
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Produto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Categoria
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estoque Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Mínimo Global
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {produtosFiltrados.length === 0 ? (
+            {carregando ? (
+              <div className="p-8 text-center text-gray-500">Carregando produtos...</div>
+            ) : produtos.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                Nenhum produto encontrado para esta categoria.
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
                   <tr>
-                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
-                      Nenhum produto encontrado.
-                    </td>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Código
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Produto
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Categoria
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Estoque Total
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Mínimo Global
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
                   </tr>
-                ) : (
-                  produtosFiltrados.map((prod) => {
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {produtos.map((prod) => {
                     const total = parseFloat(prod.quantidade_total) || 0;
                     const minimo = parseFloat(prod.minimo_global) || 0;
                     const status = total < minimo ? "⚠️ Baixo" : "✅ OK";
                     const statusClass = total < minimo ? "text-red-600" : "text-green-600";
 
                     return (
-                      <tr key={prod.produto_id} className="hover:bg-gray-50">
+                      <tr key={prod.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {prod.codigo}
                         </td>
@@ -233,7 +280,7 @@ export default function MinimosProdutos({ onVoltar }) {
                             step="0.01"
                             min="0"
                             value={prod.minimo_global}
-                            onChange={(e) => handleMinimoChange(prod.produto_id, e.target.value)}
+                            onChange={(e) => handleMinimoChange(prod.id, e.target.value)}
                             className="w-24 px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           />
                         </td>
@@ -242,10 +289,10 @@ export default function MinimosProdutos({ onVoltar }) {
                         </td>
                       </tr>
                     );
-                  })
-                )}
-              </tbody>
-            </table>
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
