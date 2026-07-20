@@ -4,9 +4,9 @@ import Auth from "./Auth";
 import Dashboard from "./Dashboard";
 import Setor from "./Setor";
 import LogsExclusao from "./pages/LogsExclusao";
-import CadastroProduto from "./pages/CadastroProduto";
+import LogsAcoes from "./pages/LogsAcoes";
 import MinimosProdutos from "./pages/MinimosProdutos";
-import LogsAcoes from "./pages/LogsAcoes"; // Nova página de logs de ações
+import CadastroProduto from "./pages/CadastroProduto";
 
 export default function App() {
   const [sessao, setSessao] = useState(null);
@@ -41,16 +41,16 @@ export default function App() {
     setTela("logsExclusao");
   }
 
-  function abrirCadastroProduto() {
-    setTela("cadastroProduto");
+  function abrirLogsAcoes() {
+    setTela("logsAcoes");
   }
 
   function abrirMinimos() {
     setTela("minimos");
   }
 
-  function abrirLogsAcoes() {
-    setTela("logsAcoes");
+  function abrirCadastroProduto() {
+    setTela("cadastroProduto");
   }
 
   if (carregando) {
@@ -67,9 +67,9 @@ export default function App() {
         sessao={sessao}
         onSelectCategoria={irParaSetor}
         onOpenLogsExclusao={abrirLogsExclusao}
-        onOpenCadastroProduto={abrirCadastroProduto}
-        onOpenMinimos={abrirMinimos}
         onOpenLogsAcoes={abrirLogsAcoes}
+        onOpenMinimos={abrirMinimos}
+        onOpenCadastroProduto={abrirCadastroProduto}
       />
     );
   }
@@ -80,9 +80,9 @@ export default function App() {
         sessao={sessao}
         categoria={categoriaAtiva}
         onVoltar={voltarDashboard}
-        onOpenCadastroProduto={abrirCadastroProduto}
-        onOpenMinimos={abrirMinimos}
         onOpenLogsAcoes={abrirLogsAcoes}
+        onOpenMinimos={abrirMinimos}
+        onOpenCadastroProduto={abrirCadastroProduto}
       />
     );
   }
@@ -91,16 +91,16 @@ export default function App() {
     return <LogsExclusao onVoltar={voltarDashboard} />;
   }
 
-  if (tela === "cadastroProduto") {
-    return <CadastroProduto onVoltar={voltarDashboard} />;
+  if (tela === "logsAcoes") {
+    return <LogsAcoes onVoltar={voltarDashboard} />;
   }
 
   if (tela === "minimos") {
     return <MinimosProdutos onVoltar={voltarDashboard} />;
   }
 
-  if (tela === "logsAcoes") {
-    return <LogsAcoes onVoltar={voltarDashboard} />;
+  if (tela === "cadastroProduto") {
+    return <CadastroProduto onVoltar={voltarDashboard} />;
   }
 
   return (
@@ -108,9 +108,9 @@ export default function App() {
       sessao={sessao}
       onSelectCategoria={irParaSetor}
       onOpenLogsExclusao={abrirLogsExclusao}
-      onOpenCadastroProduto={abrirCadastroProduto}
-      onOpenMinimos={abrirMinimos}
       onOpenLogsAcoes={abrirLogsAcoes}
+      onOpenMinimos={abrirMinimos}
+      onOpenCadastroProduto={abrirCadastroProduto}
     />
   );
 }
