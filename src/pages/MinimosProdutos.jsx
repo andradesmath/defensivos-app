@@ -19,8 +19,6 @@ export default function MinimosProdutos({ onVoltar }) {
   useEffect(() => {
     if (filtroCategoria !== "") {
       carregarProdutos();
-    } else {
-      setProdutos([]);
     }
   }, [filtroCategoria]);
 
@@ -38,74 +36,25 @@ export default function MinimosProdutos({ onVoltar }) {
     setProdutos([]);
 
     try {
-      console.log("=== CARREGANDO PRODUTOS ===");
+      console.log("=== CARREGANDO PRODUTOS DA VIEW ===");
       console.log("Filtro categoria:", filtroCategoria);
 
-      // 1. Buscar produtos da categoria selecionada
-      let query = supabase.from("produtos").select(`
-        id,
-        codigo,
-        nome,
-        minimo_global,
-        categoria_id,
-        categorias (nome)
-      `);
+      let query = supabase.from("estoque_total_produto").select("*");
 
       if (filtroCategoria !== "TODAS") {
-        query = query.eq("categorias.nome", filtroCategoria);
+        query = query.eq("categoria", filtroCategoria);
       }
 
-      const { data: prods, error: prodsError } = await query.order("nome");
+      const { data, error } = await query.order("nome");
 
-      if (prodsError) throw prodsError;
+      if (error) throw error;
 
-      console.log("Produtos encontrados:", prods?.length || 0);
-      console.log("Primeiro produto:", prods?.[0]);
+      console.log("Dados retornados:", data?.length || 0);
+      console.log("Primeiro produto:", data?.[0]);
 
-      if (!prods || prods.length === 0) {
-        setProdutos([]);
-        setCarregando(false);
-        return;
-      }
-
-      // 2. Buscar todos os itens de estoque (uma única consulta)
-      const produtoIds = prods.map(p => p.id);
-      console.log("IDs dos produtos:", produtoIds);
-
-      const { data: itens, error: itensError } = await supabase
-        .from("itens")
-        .select("produto_id, quantidade")
-        .in("produto_id", produtoIds);
-
-      if (itensError) {
-        console.warn("Erro ao buscar itens:", itensError);
-      }
-
-      console.log("Itens encontrados:", itens?.length || 0);
-
-      // 3. Calcular o total por produto
-      const totais = {};
-      if (itens) {
-        itens.forEach(item => {
-          const id = item.produto_id;
-          totais[id] = (totais[id] || 0) + (item.quantidade || 0);
-        });
-      }
-      console.log("Totais calculados:", totais);
-
-      // 4. Montar a lista final com os totais
-      const produtosComEstoque = prods.map(prod => ({
-        ...prod,
-        quantidade_total: totais[prod.id] || 0,
-        categoria: prod.categorias?.nome || "Sem categoria",
-      }));
-
-      console.log("Produtos com estoque:", produtosComEstoque.length);
-      console.log("Primeiro com estoque:", produtosComEstoque[0]);
-
-      setProdutos(produtosComEstoque);
+      setProdutos(data || []);
     } catch (err) {
-      console.error("Erro no carregamento:", err);
+      console.error("Erro:", err);
       setErro(err.message);
     } finally {
       setCarregando(false);
@@ -115,7 +64,7 @@ export default function MinimosProdutos({ onVoltar }) {
   function handleMinimoChange(produtoId, novoValor) {
     setProdutos(prev =>
       prev.map(p =>
-        p.id === produtoId
+        p.produto_id === produtoId
           ? { ...p, minimo_global: parseFloat(novoValor) || 0 }
           : p
       )
@@ -129,7 +78,7 @@ export default function MinimosProdutos({ onVoltar }) {
 
     try {
       const updates = produtos.map(p => ({
-        id: p.id,
+        id: p.produto_id,
         minimo_global: p.minimo_global,
       }));
 
@@ -148,7 +97,7 @@ export default function MinimosProdutos({ onVoltar }) {
     }
   }
 
-  // Se nenhuma categoria selecionada, mostrar tela de seleção
+  // Tela inicial (sem categoria selecionada)
   if (!filtroCategoria) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-50 to-green-50 p-4 sm:p-8">
@@ -241,7 +190,7 @@ export default function MinimosProdutos({ onVoltar }) {
               <div className="p-8 text-center text-gray-500">Carregando produtos...</div>
             ) : produtos.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
-                Nenhum produto encontrado nesta categoria.
+                Nenhum produto encontrado para esta categoria.
               </div>
             ) : (
               <table className="min-w-full divide-y divide-gray-200">
@@ -252,6 +201,9 @@ export default function MinimosProdutos({ onVoltar }) {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Produto
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Categoria
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Estoque Total
@@ -272,12 +224,15 @@ export default function MinimosProdutos({ onVoltar }) {
                     const statusClass = total < minimo ? "text-red-600" : "text-green-600";
 
                     return (
-                      <tr key={prod.id} className="hover:bg-gray-50">
+                      <tr key={prod.produto_id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {prod.codigo || "-"}
+                          {prod.codigo}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {prod.nome || "-"}
+                          {prod.nome}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {prod.categoria}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">
                           {total}
@@ -288,7 +243,7 @@ export default function MinimosProdutos({ onVoltar }) {
                             step="0.01"
                             min="0"
                             value={prod.minimo_global}
-                            onChange={(e) => handleMinimoChange(prod.id, e.target.value)}
+                            onChange={(e) => handleMinimoChange(prod.produto_id, e.target.value)}
                             className="w-24 px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           />
                         </td>
