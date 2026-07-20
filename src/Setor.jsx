@@ -35,7 +35,6 @@ const vazio = {
   validade: "",
   quantidade: "",
   unidade: "L",
-  minimo: "",
   local: LOCAIS[2],
 };
 
@@ -72,14 +71,15 @@ function corProgresso(pct) {
   return "bg-green-600";
 }
 
-function getStatusInfo(item) {
+function getStatusInfo(item, minimoGlobal) {
+  const minimo = minimoGlobal || 0;
   if (item.vencido) return { label: "Vencido", class: "bg-red-100 text-red-700 border-red-300" };
   if (item.proximoVencimento) return { label: `Vence em ${item.dias}d`, class: "bg-amber-100 text-amber-700 border-amber-300" };
-  if (item.estoqueBaixo) return { label: "Estoque baixo", class: "bg-orange-100 text-orange-700 border-orange-300" };
+  if (item.quantidade <= minimo) return { label: "Estoque baixo", class: "bg-orange-100 text-orange-700 border-orange-300" };
   return { label: "OK", class: "bg-green-100 text-green-700 border-green-300" };
 }
 
-export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProduto }) {
+export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProduto, onOpenMinimos }) {
   // ===== ESTADOS =====
   const [itens, setItens] = useState([]);
   const [produtos, setProdutos] = useState([]);
@@ -151,7 +151,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
       .from("itens")
       .select(`
         *,
-        produtos!inner (categoria_id)
+        produtos!inner (categoria_id, minimo_global)
       `)
       .eq("produtos.categoria_id", categoria.id)
       .order("validade", { ascending: true });
@@ -198,7 +198,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
   }
 
   // ============================================================
-  // FORMULÁRIO – com busca de produtos
+  // FORMULÁRIO – com busca de produtos (sem campo Mínimo)
   // ============================================================
   function abrirNovo() {
     setForm({ ...vazio });
@@ -216,7 +216,6 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
       validade: item.validade,
       quantidade: String(item.quantidade),
       unidade: item.unidade,
-      minimo: String(item.minimo),
       local: item.local || LOCAIS[2],
     });
     setTermoBusca(produto ? `${produto.codigo} - ${produto.nome}` : item.nome);
@@ -343,10 +342,6 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
       setErro("Informe uma quantidade válida (maior que zero).");
       return;
     }
-    if (form.minimo === "" || isNaN(form.minimo) || parseFloat(form.minimo) <= 0) {
-      setErro("Informe um estoque mínimo válido (maior que zero).");
-      return;
-    }
     if (!form.local) {
       setErro("Selecione o local de armazenamento.");
       return;
@@ -359,7 +354,6 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
       validade: form.validade,
       quantidade: parseFloat(form.quantidade),
       unidade: form.unidade,
-      minimo: parseFloat(form.minimo),
       local: form.local,
       updated_by: sessao.user.id,
     };
@@ -595,7 +589,6 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
         validade: itemTransferir.validade,
         quantidade: qtd,
         unidade: itemTransferir.unidade,
-        minimo: itemTransferir.minimo,
         local: localDestino,
         created_by: sessao.user.id,
         updated_by: sessao.user.id,
@@ -666,8 +659,9 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
         const dias = diasAte(it.validade);
         const vencido = dias !== null && dias < 0;
         const proximoVencimento = !vencido && dias !== null && dias <= DIAS_ALERTA_VENCIMENTO;
-        const estoqueBaixo = it.quantidade <= it.minimo;
-        return { ...it, dias, vencido, proximoVencimento, estoqueBaixo };
+        // Busca o minimo_global do produto associado
+        const minimoGlobal = it.produtos?.minimo_global || 0;
+        return { ...it, dias, vencido, proximoVencimento, minimoGlobal };
       }),
     [itens]
   );
@@ -676,7 +670,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
     () => ({
       vencidos: itensComStatus.filter((i) => i.vencido).length,
       proximos: itensComStatus.filter((i) => i.proximoVencimento).length,
-      baixos: itensComStatus.filter((i) => i.estoqueBaixo).length,
+      baixos: itensComStatus.filter((i) => i.quantidade <= (i.minimoGlobal || 0)).length,
     }),
     [itensComStatus]
   );
@@ -685,7 +679,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
     let lista = itensComStatus;
     if (filtroAlerta === "vencidos") lista = lista.filter((i) => i.vencido);
     if (filtroAlerta === "proximos") lista = lista.filter((i) => i.proximoVencimento);
-    if (filtroAlerta === "baixos") lista = lista.filter((i) => i.estoqueBaixo);
+    if (filtroAlerta === "baixos") lista = lista.filter((i) => i.quantidade <= (i.minimoGlobal || 0));
     if (filtroLocal !== "todos") lista = lista.filter((i) => i.local === filtroLocal);
     if (busca.trim()) {
       const b = busca.trim().toLowerCase();
@@ -741,6 +735,12 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
                 className="flex items-center gap-1.5 bg-blue-500/20 text-white hover:bg-blue-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
               >
                 <Package size={18} /> Novo Produto
+              </button>
+              <button
+                onClick={onOpenMinimos}
+                className="flex items-center gap-1.5 bg-purple-500/20 text-white hover:bg-purple-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
+              >
+                <Package size={18} /> Mínimos
               </button>
               <button
                 onClick={handleLogout}
@@ -884,8 +884,8 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
             </div>
           ) : (
             listaFiltrada.map((it) => {
-              const pct = it.minimo > 0 ? Math.min(100, Math.round((it.quantidade / (it.minimo * 2)) * 100)) : 100;
-              const status = getStatusInfo(it);
+              const pct = it.minimoGlobal > 0 ? Math.min(100, Math.round((it.quantidade / (it.minimoGlobal * 2)) * 100)) : 100;
+              const status = getStatusInfo(it, it.minimoGlobal);
               return (
                 <div key={it.id} className="bg-white rounded-2xl border border-gray-200 shadow-md hover:shadow-lg transition-all overflow-hidden flex flex-col">
                   <div className="p-4 pb-2 flex items-start justify-between gap-2 border-b border-gray-100">
@@ -902,7 +902,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
                       <span className="text-gray-500">Lote:</span><span className="font-medium text-gray-700 text-right">{it.lote}</span>
                       <span className="text-gray-500">Validade:</span><span className="font-medium text-gray-700 text-right">{formatarDataBR(it.validade)}</span>
                       <span className="text-gray-500">Quantidade:</span><span className="font-medium text-gray-700 text-right">{it.quantidade} {it.unidade}</span>
-                      <span className="text-gray-500">Mínimo:</span><span className="font-medium text-gray-700 text-right">{it.minimo} {it.unidade}</span>
+                      <span className="text-gray-500">Mínimo:</span><span className="font-medium text-gray-700 text-right">{it.minimoGlobal} {it.unidade}</span>
                     </div>
                     <div className="mt-1 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full transition-all duration-500 ${corProgresso(pct)}`} style={{ width: `${pct}%` }} />
@@ -953,7 +953,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
 
       {/* ===== MODAIS ===== */}
 
-      {/* MODAL FORMULÁRIO (mesmo código anterior) */}
+      {/* MODAL FORMULÁRIO (sem campo Mínimo) */}
       {mostrarForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -1039,7 +1039,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600">Quantidade *</label>
                   <input
@@ -1060,17 +1060,6 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
                   >
                     {UNIDADES.map((u) => <option key={u} value={u}>{u}</option>)}
                   </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600">Mínimo *</label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={form.minimo}
-                    onChange={(e) => setForm({ ...form, minimo: e.target.value })}
-                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                  />
                 </div>
               </div>
               {erro && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">{erro}</div>}
