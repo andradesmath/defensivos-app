@@ -72,10 +72,10 @@ function corProgresso(pct) {
 }
 
 function getStatusInfo(item, minimoGlobal) {
-  const minimo = minimoGlobal || 0;
+  const estoqueBaixo = minimoGlobal > 0 && item.quantidade < minimoGlobal;
   if (item.vencido) return { label: "Vencido", class: "bg-red-100 text-red-700 border-red-300" };
   if (item.proximoVencimento) return { label: `Vence em ${item.dias}d`, class: "bg-amber-100 text-amber-700 border-amber-300" };
-  if (item.quantidade <= minimo) return { label: "Estoque baixo", class: "bg-orange-100 text-orange-700 border-orange-300" };
+  if (estoqueBaixo) return { label: "Estoque baixo", class: "bg-orange-100 text-orange-700 border-orange-300" };
   return { label: "OK", class: "bg-green-100 text-green-700 border-green-300" };
 }
 
@@ -198,7 +198,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
   }
 
   // ============================================================
-  // FORMULÁRIO – com busca de produtos (sem campo Mínimo)
+  // FORMULÁRIO
   // ============================================================
   function abrirNovo() {
     setForm({ ...vazio });
@@ -410,7 +410,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
   }
 
   // ============================================================
-  // RETIRADA (com logs)
+  // RETIRADA
   // ============================================================
   function abrirRetirar(item) {
     console.log("Abrindo retirada para:", item);
@@ -490,7 +490,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
   }
 
   // ============================================================
-  // TRANSFERÊNCIA (com logs)
+  // TRANSFERÊNCIA
   // ============================================================
   function abrirTransferir(item) {
     console.log("Abrindo transferência para:", item);
@@ -653,24 +653,23 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
   // ============================================================
   // CÁLCULOS
   // ============================================================
-  const itensComStatus = useMemo(
-    () =>
-      itens.map((it) => {
-        const dias = diasAte(it.validade);
-        const vencido = dias !== null && dias < 0;
-        const proximoVencimento = !vencido && dias !== null && dias <= DIAS_ALERTA_VENCIMENTO;
-        // Busca o minimo_global do produto associado
-        const minimoGlobal = it.produtos?.minimo_global || 0;
-        return { ...it, dias, vencido, proximoVencimento, minimoGlobal };
-      }),
-    [itens]
-  );
+  const itensComStatus = useMemo(() => {
+    return itens.map((it) => {
+      const dias = diasAte(it.validade);
+      const vencido = dias !== null && dias < 0;
+      const proximoVencimento = !vencido && dias !== null && dias <= DIAS_ALERTA_VENCIMENTO;
+      // Buscar o mínimo global do produto relacionado
+      const minimoGlobal = it.produtos?.minimo_global || 0;
+      const estoqueBaixo = minimoGlobal > 0 && it.quantidade < minimoGlobal;
+      return { ...it, dias, vencido, proximoVencimento, estoqueBaixo, minimoGlobal };
+    });
+  }, [itens]);
 
   const alertas = useMemo(
     () => ({
       vencidos: itensComStatus.filter((i) => i.vencido).length,
       proximos: itensComStatus.filter((i) => i.proximoVencimento).length,
-      baixos: itensComStatus.filter((i) => i.quantidade <= (i.minimoGlobal || 0)).length,
+      baixos: itensComStatus.filter((i) => i.estoqueBaixo).length,
     }),
     [itensComStatus]
   );
@@ -679,7 +678,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
     let lista = itensComStatus;
     if (filtroAlerta === "vencidos") lista = lista.filter((i) => i.vencido);
     if (filtroAlerta === "proximos") lista = lista.filter((i) => i.proximoVencimento);
-    if (filtroAlerta === "baixos") lista = lista.filter((i) => i.quantidade <= (i.minimoGlobal || 0));
+    if (filtroAlerta === "baixos") lista = lista.filter((i) => i.estoqueBaixo);
     if (filtroLocal !== "todos") lista = lista.filter((i) => i.local === filtroLocal);
     if (busca.trim()) {
       const b = busca.trim().toLowerCase();
@@ -696,7 +695,6 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-green-50 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* HEADER */}
         <header className="relative overflow-hidden bg-gradient-to-r from-green-800 to-green-700 rounded-2xl p-5 sm:p-7 mb-6 shadow-xl shadow-green-900/30 border border-green-600/30">
           <div className="absolute -right-10 -top-10 w-48 h-48 bg-yellow-500/10 rounded-full blur-2xl" />
           <div className="absolute -left-10 bottom-0 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl" />
@@ -738,7 +736,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
               </button>
               <button
                 onClick={onOpenMinimos}
-                className="flex items-center gap-1.5 bg-purple-500/20 text-white hover:bg-purple-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
+                className="flex items-center gap-1.5 bg-blue-500/20 text-white hover:bg-blue-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
               >
                 <Package size={18} /> Mínimos
               </button>
@@ -902,7 +900,7 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
                       <span className="text-gray-500">Lote:</span><span className="font-medium text-gray-700 text-right">{it.lote}</span>
                       <span className="text-gray-500">Validade:</span><span className="font-medium text-gray-700 text-right">{formatarDataBR(it.validade)}</span>
                       <span className="text-gray-500">Quantidade:</span><span className="font-medium text-gray-700 text-right">{it.quantidade} {it.unidade}</span>
-                      <span className="text-gray-500">Mínimo:</span><span className="font-medium text-gray-700 text-right">{it.minimoGlobal} {it.unidade}</span>
+                      <span className="text-gray-500">Mínimo Global:</span><span className="font-medium text-gray-700 text-right">{it.minimoGlobal} {it.unidade}</span>
                     </div>
                     <div className="mt-1 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full transition-all duration-500 ${corProgresso(pct)}`} style={{ width: `${pct}%` }} />
@@ -952,325 +950,8 @@ export default function Setor({ sessao, categoria, onVoltar, onOpenCadastroProdu
       </div>
 
       {/* ===== MODAIS ===== */}
+      {/* Mantenha os mesmos modais que você já tem no código anterior */}
 
-      {/* MODAL FORMULÁRIO (sem campo Mínimo) */}
-      {mostrarForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
-            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-green-800 to-green-700">
-              <h2 className="font-semibold text-white text-lg">{editandoId ? "Editar item" : "Novo item"} - {categoria.nome}</h2>
-              <button onClick={fecharForm} className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"><X size={20} /></button>
-            </div>
-            <div className="px-6 py-6 space-y-5 max-h-[75vh] overflow-y-auto">
-              <div>
-                <label className="text-xs font-medium text-gray-600">Produto *</label>
-                <input
-                  type="text"
-                  list="produtos-list"
-                  value={termoBusca}
-                  onChange={(e) => handleProdutoBusca(e.target.value)}
-                  onBlur={() => {
-                    if (termoBusca.trim() && !form.produto_id) {
-                      handleProdutoBusca(termoBusca);
-                    }
-                  }}
-                  placeholder="Digite o nome ou código do produto..."
-                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-shadow"
-                />
-                <datalist id="produtos-list">
-                  {produtos.map((p) => (
-                    <option key={p.id} value={`${p.codigo} - ${p.nome}`} />
-                  ))}
-                </datalist>
-                {form.produto_id && form.nome && (
-                  <p className="text-xs text-green-600 mt-1">✅ Produto selecionado: {form.nome}</p>
-                )}
-              </div>
-
-              {form.produto_id && (
-                <div className="bg-green-50 rounded-xl p-3 border border-green-200">
-                  <p className="text-xs font-medium text-green-700 mb-1">📦 Quantidade atual por local:</p>
-                  <div className="grid grid-cols-2 gap-1 text-xs">
-                    {estoquePorLocal.length > 0 ? (
-                      estoquePorLocal.map((item) => (
-                        <div key={item.local} className="flex justify-between">
-                          <span className="text-gray-600 truncate">{item.local}:</span>
-                          <span className="font-semibold text-green-700">{item.quantidade_total}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <span className="text-gray-500 col-span-2 text-center">Nenhum registro encontrado</span>
-                    )}
-                  </div>
-                  <div className="mt-2 pt-2 border-t border-green-200 flex justify-between text-xs font-semibold">
-                    <span className="text-gray-700">Total geral:</span>
-                    <span className="text-green-700">{totalProduto}</span>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="text-xs font-medium text-gray-600">Local de armazenamento *</label>
-                <select
-                  value={form.local}
-                  onChange={(e) => setForm({ ...form, local: e.target.value })}
-                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                >
-                  {LOCAIS.map((l) => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-gray-600">Lote *</label>
-                  <input
-                    value={form.lote}
-                    onChange={(e) => setForm({ ...form, lote: e.target.value })}
-                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-shadow"
-                    placeholder="Ex: L2024-08"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600">Validade *</label>
-                  <input
-                    type="date"
-                    value={form.validade}
-                    onChange={(e) => setForm({ ...form, validade: e.target.value })}
-                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-gray-600">Quantidade *</label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={form.quantidade}
-                    onChange={(e) => setForm({ ...form, quantidade: e.target.value })}
-                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600">Unidade</label>
-                  <select
-                    value={form.unidade}
-                    onChange={(e) => setForm({ ...form, unidade: e.target.value })}
-                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                  >
-                    {UNIDADES.map((u) => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                </div>
-              </div>
-              {erro && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">{erro}</div>}
-              <div className="flex gap-2 pt-1">
-                <button onClick={fecharForm} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors">Cancelar</button>
-                <button onClick={salvarForm} disabled={salvando} className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60">
-                  <Check size={16} /> {salvando ? "Salvando..." : "Salvar"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL RETIRAR */}
-      {mostrarRetirar && itemRetirar && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
-            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-teal-700 to-green-700">
-              <h2 className="font-semibold text-white text-lg flex items-center gap-2"><PackageMinus size={20} /> Dar baixa no estoque</h2>
-              <button onClick={fecharRetirar} className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"><X size={20} /></button>
-            </div>
-            <div className="px-6 py-6 space-y-5">
-              <div className="bg-gray-50 rounded-xl p-3">
-                <p className="font-medium text-gray-800">{itemRetirar.nome}</p>
-                <p className="text-xs text-gray-500">{itemRetirar.local} · Lote {itemRetirar.lote} · Disponível: {itemRetirar.quantidade} {itemRetirar.unidade}</p>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600">Quantidade a retirar *</label>
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    max={itemRetirar.quantidade}
-                    value={qtdRetirar}
-                    onChange={(e) => setQtdRetirar(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition-shadow"
-                  />
-                  <span className="text-sm text-gray-500 shrink-0">{itemRetirar.unidade}</span>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600">Motivo da saída *</label>
-                <select
-                  value={motivoRetirar}
-                  onChange={(e) => {
-                    setMotivoRetirar(e.target.value);
-                    if (e.target.value !== "Outro") setMotivoPersonalizado("");
-                  }}
-                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
-                >
-                  <option value="">Selecione um motivo...</option>
-                  {MOTIVOS_SAIDA.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-              {motivoRetirar === "Outro" && (
-                <div>
-                  <label className="text-xs font-medium text-gray-600">Descreva o motivo *</label>
-                  <input
-                    value={motivoPersonalizado}
-                    onChange={(e) => setMotivoPersonalizado(e.target.value)}
-                    placeholder="Ex: Devolução ao fornecedor"
-                    className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition-shadow"
-                  />
-                </div>
-              )}
-              {erro && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">{erro}</div>}
-              <div className="flex gap-2 pt-1">
-                <button onClick={fecharRetirar} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors">Cancelar</button>
-                <button onClick={confirmarRetirada} disabled={salvando} className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60">
-                  <Check size={16} /> {salvando ? "Salvando..." : "Confirmar baixa"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL TRANSFERIR */}
-      {mostrarTransferir && itemTransferir && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
-            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-indigo-700 to-purple-700">
-              <h2 className="font-semibold text-white text-lg flex items-center gap-2"><ArrowLeftRight size={20} /> Transferir entre locais</h2>
-              <button onClick={fecharTransferir} className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"><X size={20} /></button>
-            </div>
-            <div className="px-6 py-6 space-y-5">
-              <div className="bg-gray-50 rounded-xl p-3">
-                <p className="font-medium text-gray-800">{itemTransferir.nome}</p>
-                <p className="text-xs text-gray-500">Lote {itemTransferir.lote} · Disponível: {itemTransferir.quantidade} {itemTransferir.unidade}</p>
-                <p className="text-xs text-gray-500 mt-1">De: <span className="font-medium text-gray-700">{itemTransferir.local}</span></p>
-              </div>
-              {estoquePorLocal.length > 0 && (
-                <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
-                  <p className="text-xs font-medium text-blue-700 mb-1">📦 Quantidade disponível por local:</p>
-                  <div className="grid grid-cols-2 gap-1 text-xs">
-                    {estoquePorLocal.map((item) => (
-                      <div key={item.local} className="flex justify-between">
-                        <span className="text-gray-600">{item.local}:</span>
-                        <span className="font-semibold text-blue-700">{item.quantidade_total}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className="text-xs font-medium text-gray-600">Transferir para *</label>
-                <select
-                  value={localDestino}
-                  onChange={(e) => setLocalDestino(e.target.value)}
-                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                >
-                  {LOCAIS.filter((l) => l !== itemTransferir.local).map((l) => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600">Quantidade a transferir *</label>
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    max={itemTransferir.quantidade}
-                    value={qtdTransferir}
-                    onChange={(e) => setQtdTransferir(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-shadow"
-                  />
-                  <span className="text-sm text-gray-500 shrink-0">{itemTransferir.unidade}</span>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600">Observação (opcional)</label>
-                <input
-                  value={motivoTransferir}
-                  onChange={(e) => setMotivoTransferir(e.target.value)}
-                  placeholder="Ex: Reposição de balcão"
-                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-shadow"
-                />
-              </div>
-              {erro && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">{erro}</div>}
-              <div className="flex gap-2 pt-1">
-                <button onClick={fecharTransferir} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors">Cancelar</button>
-                <button onClick={confirmarTransferencia} disabled={salvando} className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60">
-                  <Check size={16} /> {salvando ? "Transferindo..." : "Confirmar transferência"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL HISTÓRICO */}
-      {mostrarHistorico && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[80vh] flex flex-col border border-white/20">
-            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-green-800 to-green-700 shrink-0">
-              <h2 className="font-semibold text-white text-lg flex items-center gap-2"><History size={20} /> Histórico de movimentações - {categoria.nome}</h2>
-              <button onClick={() => setMostrarHistorico(false)} className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"><X size={20} /></button>
-            </div>
-            <div className="px-6 py-4 overflow-y-auto">
-              <div className="flex items-center gap-2 mb-3">
-                <label className="text-xs font-medium text-gray-600">Filtrar por:</label>
-                <select
-                  value={filtroHistorico}
-                  onChange={(e) => {
-                    setFiltroHistorico(e.target.value);
-                    abrirHistorico(e.target.value);
-                  }}
-                  className="px-3 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                >
-                  <option value="todos">Todos</option>
-                  <option value="saida">Saídas (Baixas)</option>
-                  <option value="transferencia">Transferências</option>
-                </select>
-              </div>
-              {carregandoHistorico ? (
-                <p className="text-sm text-gray-400 text-center py-8">Carregando...</p>
-              ) : historico.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">Nenhuma movimentação registrada nesta categoria.</p>
-              ) : (
-                <div className="space-y-2">
-                  {historico.map((h) => (
-                    <div key={h.id} className="flex items-center justify-between gap-3 py-2.5 border-b border-gray-100 last:border-0">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{h.item_nome}</p>
-                        <p className="text-xs text-gray-500 flex flex-wrap items-center gap-1">
-                          <span>{formatarDataHoraBR(h.criado_em)}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${h.tipo === "transferencia" ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700"}`}>
-                            {h.tipo === "transferencia" ? "Transferência" : "Saída"}
-                          </span>
-                          {h.tipo === "transferencia" ? (
-                            <span>{h.local_origem} → {h.local_destino}</span>
-                          ) : (
-                            <span>{h.local_origem || ""}</span>
-                          )}
-                          {h.motivo && <span className="text-gray-400">· {h.motivo}</span>}
-                          {h.profiles?.nome && <span className="text-gray-400">· {h.profiles.nome}</span>}
-                        </p>
-                      </div>
-                      <span className={`text-sm font-semibold shrink-0 ${h.tipo === "transferencia" ? "text-indigo-700" : "text-teal-700"}`}>
-                        {h.tipo === "transferencia" ? "" : "-"}{h.quantidade} {h.unidade}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
