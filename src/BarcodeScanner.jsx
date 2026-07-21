@@ -5,13 +5,14 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
   const fileInputRef = useRef(null);
   const [status, setStatus] = useState('inativo');
   const [errorMsg, setErrorMsg] = useState('');
-  const [modo, setModo] = useState('camera'); // 'camera' ou 'upload'
+  const [modo, setModo] = useState('camera');
   const scanDoneRef = useRef(false);
   const intervalRef = useRef(null);
   const streamRef = useRef(null);
 
   // ========== CÂMERA ==========
   const iniciarCamera = async () => {
+    console.log('[Scanner] Iniciando câmera...');
     setStatus('iniciando');
     setErrorMsg('');
     scanDoneRef.current = false;
@@ -20,6 +21,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 640 } }
       });
+      console.log('[Scanner] Câmera acessada com sucesso.');
       streamRef.current = stream;
       const video = videoRef.current;
       if (video) {
@@ -33,7 +35,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
         }, 200);
       }
     } catch (err) {
-      console.error('Erro ao iniciar câmera:', err);
+      console.error('[Scanner] Erro ao acessar câmera:', err);
       setStatus('erro');
       let msg = 'Falha ao acessar a câmera.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -53,23 +55,9 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
   const capturarEdecodificar = async (video) => {
     try {
       if (!('BarcodeDetector' in window)) {
-        // Fallback para @zxing/browser (se disponível)
-        try {
-          const { BrowserMultiFormatReader } = await import('@zxing/browser');
-          const reader = new BrowserMultiFormatReader();
-          const result = await reader.decodeFromVideoElement(video);
-          if (result && !scanDoneRef.current) {
-            const code = result.getText();
-            if (code) {
-              scanDoneRef.current = true;
-              onScan(code);
-              pararScanner();
-            }
-          }
-        } catch {
-          setStatus('erro');
-          setErrorMsg('Seu navegador não suporta leitura de código de barras. Use Chrome ou Edge.');
-        }
+        console.warn('[Scanner] BarcodeDetector não suportado.');
+        setStatus('erro');
+        setErrorMsg('Seu navegador não suporta leitura de código de barras. Use Chrome ou Edge.');
         return;
       }
 
@@ -86,6 +74,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
       const detections = await detector.detect(imageData);
       if (detections.length > 0 && !scanDoneRef.current) {
         const code = detections[0].rawValue;
+        console.log('[Scanner] Código lido:', code);
         if (code) {
           scanDoneRef.current = true;
           onScan(code);
@@ -93,7 +82,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
         }
       }
     } catch (err) {
-      console.warn('Erro na captura:', err);
+      console.warn('[Scanner] Erro na captura:', err);
     }
   };
 
@@ -112,6 +101,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    console.log('[Scanner] Arquivo selecionado:', file.name);
     try {
       setStatus('iniciando');
       const image = new Image();
@@ -119,7 +109,6 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
       image.src = url;
       await image.decode();
       
-      // Detecta o código na imagem
       if (!('BarcodeDetector' in window)) {
         alert('Seu navegador não suporta leitura de código de barras. Use Chrome ou Edge.');
         setStatus('erro');
@@ -139,6 +128,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
       const detections = await detector.detect(imageData);
       if (detections.length > 0 && !scanDoneRef.current) {
         const code = detections[0].rawValue;
+        console.log('[Scanner] Código lido via upload:', code);
         if (code) {
           scanDoneRef.current = true;
           onScan(code);
@@ -149,6 +139,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
         setErrorMsg('Nenhum código de barras encontrado na imagem. Tente outra foto.');
       }
     } catch (err) {
+      console.error('[Scanner] Erro no upload:', err);
       setStatus('erro');
       setErrorMsg('Erro ao processar a imagem: ' + err.message);
     } finally {
@@ -163,32 +154,25 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
     };
   }, []);
 
-  // Abre as configurações de permissão do navegador
-  const abrirConfiguracoesCamera = () => {
-    const url = navigator.userAgent.includes('Chrome') 
-      ? 'chrome://settings/content/camera' 
-      : navigator.userAgent.includes('Edge') 
-      ? 'edge://settings/content/camera' 
-      : '#';
-    window.open(url, '_blank');
-  };
-
   // ========== RENDER ==========
   return (
     <div className="relative w-full h-full bg-black rounded-xl overflow-hidden">
       <video ref={videoRef} className="w-full h-full object-cover" />
 
-      {/* Tela inicial: botão ativar câmera */}
+      {/* Tela inicial */}
       {status === 'inativo' && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-4">
           <p className="text-white text-center mb-4">
-            Para ler o código de barras, precisamos acessar sua câmera.
+            Leia o código de barras do produto.
           </p>
           <button
-            onClick={iniciarCamera}
+            onClick={() => {
+              setModo('upload');
+              fileInputRef.current?.click();
+            }}
             className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
           >
-            📷 Ativar câmera
+            📤 Enviar foto do código de barras
           </button>
           <div className="flex items-center gap-2 mt-4">
             <hr className="w-12 border-gray-600" />
@@ -196,13 +180,10 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
             <hr className="w-12 border-gray-600" />
           </div>
           <button
-            onClick={() => {
-              setModo('upload');
-              fileInputRef.current?.click();
-            }}
+            onClick={iniciarCamera}
             className="text-blue-400 text-sm hover:underline mt-2"
           >
-            📤 Enviar foto do código de barras
+            📷 Usar câmera
           </button>
           <input
             type="file"
@@ -213,7 +194,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
             onChange={handleFileUpload}
           />
           <p className="text-gray-400 text-xs mt-4">
-            O acesso à câmera é necessário apenas para esta leitura.
+            O upload da imagem não requer permissões especiais.
           </p>
         </div>
       )}
@@ -239,14 +220,10 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
                 setStatus('inativo');
                 setErrorMsg('');
                 pararScanner();
-                // Se for erro de permissão, abre config
-                if (errorMsg.includes('Permissão negada')) {
-                  abrirConfiguracoesCamera();
-                }
               }}
               className="px-4 py-2 bg-blue-600 rounded-lg text-sm hover:bg-blue-700 transition-colors"
             >
-              {errorMsg.includes('Permissão negada') ? '⚙️ Abrir configurações' : '🔁 Tentar novamente'}
+              🔁 Tentar novamente
             </button>
             <button
               onClick={() => {
@@ -258,12 +235,6 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
               Cancelar
             </button>
           </div>
-          {errorMsg.includes('Permissão negada') && (
-            <p className="text-gray-400 text-xs mt-4 text-center max-w-xs">
-              Após permitir, recarregue a página e tente novamente.
-            </p>
-          )}
-          {/* Fallback: upload de imagem mesmo em erro */}
           <button
             onClick={() => {
               setModo('upload');
@@ -271,7 +242,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
             }}
             className="text-blue-400 text-sm hover:underline mt-4"
           >
-            📤 Ou envie uma foto do código de barras
+            📤 Tentar enviar foto
           </button>
           <input
             type="file"
