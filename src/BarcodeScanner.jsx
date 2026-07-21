@@ -13,17 +13,12 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
       try {
         const videoInput = videoRef.current;
         if (!videoInput) return;
-        
         await reader.decodeFromVideoDevice(null, videoInput, (result, err) => {
           if (result) {
             const code = result.getText();
-            if (code) {
-              onScan(code);
-            }
+            if (code) onScan(code);
           }
-          if (err && !(err instanceof Error)) {
-            // Ignora erros de "no barcode found"
-          }
+          // Ignora erros de "no barcode found"
         });
       } catch (error) {
         if (onError) onError(error);
