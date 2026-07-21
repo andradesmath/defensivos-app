@@ -216,10 +216,8 @@ export default function Setor({
   const handleScanBarcode = (codigo) => {
     if (!codigo) return;
     setScannerError("");
-    // Remove espaços e caracteres especiais
     const codigoLimpo = codigo.trim().replace(/^0+/, '');
     
-    // Tenta encontrar o produto pelo código (com ou sem zeros à esquerda)
     const encontrado = produtos.find(p => {
       const codigoProduto = p.codigo.replace(/^0+/, '');
       return codigoProduto === codigoLimpo || p.codigo === codigo;
