@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Package, LogOut, Layers, ChevronLeft, Tractor, AlertTriangle, FileText } from "lucide-react";
+import { Package, LogOut, Layers, ChevronLeft, Tractor, AlertTriangle, FileText, ClipboardList, Settings } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
 // Fallback local (caso o Supabase falhe)
@@ -32,7 +32,14 @@ const CATEGORIAS_PADRAO = [
   { id: '26', nome: 'VETERINÁRIO', descricao: 'Produtos veterinários' },
 ];
 
-export default function Dashboard({ sessao, onSelectCategoria, onOpenLogs, onOpenCadastroProduto, onOpenMinimos }) {
+export default function Dashboard({ 
+  sessao, 
+  onSelectCategoria, 
+  onOpenLogsExclusao, 
+  onOpenLogsAcoes,
+  onOpenMinimos,
+  onOpenCadastroProduto 
+}) {
   const [categorias, setCategorias] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
@@ -48,7 +55,6 @@ export default function Dashboard({ sessao, onSelectCategoria, onOpenLogs, onOpe
     setErro(null);
     setUsandoFallback(false);
 
-    // Verifica sessão ativa
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData?.session) {
       setDebugInfo({ motivo: "Sem sessão ativa", sessionError: sessionError?.message || null });
@@ -113,27 +119,30 @@ export default function Dashboard({ sessao, onSelectCategoria, onOpenLogs, onOpe
                 <p className="text-sm text-green-100">Sistema de Gestão de Estoque</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {/* Botão Mínimos */}
+            <div className="flex items-center gap-2 flex-wrap">
               <button
-                onClick={onOpenMinimos}
+                onClick={onOpenLogsAcoes}
                 className="flex items-center gap-1.5 bg-blue-500/20 text-white hover:bg-blue-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
               >
-                <Package size={18} /> Mínimos
+                <ClipboardList size={18} /> Logs Ações
               </button>
-              {/* Botão Novo Produto */}
               <button
-                onClick={onOpenCadastroProduto}
+                onClick={onOpenLogsExclusao}
                 className="flex items-center gap-1.5 bg-purple-500/20 text-white hover:bg-purple-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
               >
-                <Package size={18} /> Novo Produto
+                <FileText size={18} /> Logs Exclusão
               </button>
-              {/* Botão Logs de Exclusão */}
               <button
-                onClick={onOpenLogs}
-                className="flex items-center gap-1.5 bg-orange-500/20 text-white hover:bg-orange-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
+                onClick={onOpenMinimos}
+                className="flex items-center gap-1.5 bg-amber-500/20 text-white hover:bg-amber-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
               >
-                <FileText size={18} /> Logs
+                <Settings size={18} /> Mínimos
+              </button>
+              <button
+                onClick={onOpenCadastroProduto}
+                className="flex items-center gap-1.5 bg-indigo-500/20 text-white hover:bg-indigo-500/30 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/10"
+              >
+                <Package size={18} /> Novo Produto
               </button>
               <button
                 onClick={handleLogout}
@@ -145,7 +154,6 @@ export default function Dashboard({ sessao, onSelectCategoria, onOpenLogs, onOpe
           </div>
         </header>
 
-        {/* Erros e fallback */}
         {erro && (
           <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-5 mb-6 flex gap-3">
             <AlertTriangle className="text-red-500 flex-shrink-0" size={22} />
