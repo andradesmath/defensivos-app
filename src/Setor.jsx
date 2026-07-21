@@ -3,9 +3,10 @@ import {
   AlertTriangle, AlertOctagon, PackageX, PackageMinus,
   ArrowLeftRight, Plus, Trash2, Pencil, X, Check,
   Search, History, MapPin, LogOut, ChevronLeft,
-  Sprout, Package, ClipboardList, Settings
+  Sprout, Package, ClipboardList, Settings, Camera
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
+import { Scanner } from "react-qr-barcode-scanner";
 
 const DIAS_ALERTA_VENCIMENTO = 90;
 const UNIDADES = ["L", "mL", "kg", "g", "un", "M"];
@@ -72,7 +73,6 @@ function corProgresso(pct) {
 }
 
 function getStatusInfo(item, minimoGlobal) {
-  // Se a quantidade for zero, não mostra alerta de vencimento ou estoque baixo
   if (item.quantidade <= 0) {
     return { label: "Zerado", class: "bg-gray-100 text-gray-500 border-gray-300" };
   }
@@ -131,6 +131,10 @@ export default function Setor({
   const [historico, setHistorico] = useState([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   const [filtroHistorico, setFiltroHistorico] = useState('todos');
+
+  // ===== ESTADO PARA O SCANNER =====
+  const [mostrarScanner, setMostrarScanner] = useState(false);
+  const [scannerError, setScannerError] = useState("");
 
   // ============================================================
   // CARREGAR DADOS DA CATEGORIA
@@ -207,6 +211,39 @@ export default function Setor({
   }
 
   // ============================================================
+  // SCANNER
+  // ============================================================
+  const handleScanBarcode = (codigo) => {
+    if (!codigo) return;
+    setScannerError("");
+    // Remove espaços e caracteres especiais
+    const codigoLimpo = codigo.trim().replace(/^0+/, '');
+    
+    // Tenta encontrar o produto pelo código (com ou sem zeros à esquerda)
+    const encontrado = produtos.find(p => {
+      const codigoProduto = p.codigo.replace(/^0+/, '');
+      return codigoProduto === codigoLimpo || p.codigo === codigo;
+    });
+
+    if (encontrado) {
+      setForm({
+        ...form,
+        produto_id: encontrado.id,
+        nome: encontrado.nome,
+      });
+      setTermoBusca(`${encontrado.codigo} - ${encontrado.nome}`);
+      setMostrarScanner(false);
+      // Foca no campo de lote após encontrar
+      setTimeout(() => {
+        const loteInput = document.getElementById('lote-input');
+        if (loteInput) loteInput.focus();
+      }, 100);
+    } else {
+      setScannerError(`Produto com código ${codigo} não encontrado.`);
+    }
+  };
+
+  // ============================================================
   // LOGOUT
   // ============================================================
   async function handleLogout() {
@@ -246,6 +283,7 @@ export default function Setor({
     setTermoBusca("");
     setEstoquePorLocal([]);
     setTotalProduto(0);
+    setScannerError("");
   }
 
   function handleProdutoBusca(texto) {
@@ -639,13 +677,12 @@ export default function Setor({
   }
 
   // ============================================================
-  // CÁLCULOS – CORRIGIDOS PARA NÃO GERAR ALERTAS EM ITENS ZERADOS
+  // CÁLCULOS
   // ============================================================
   const itensComStatus = useMemo(
     () =>
       itens.map((it) => {
         const dias = diasAte(it.validade);
-        // Só considera vencido se a quantidade for maior que zero
         const vencido = dias !== null && dias < 0 && it.quantidade > 0;
         const proximoVencimento = !vencido && dias !== null && dias <= DIAS_ALERTA_VENCIMENTO && it.quantidade > 0;
         const minimoGlobal = it.produtos?.minimo_global || 0;
@@ -952,7 +989,7 @@ export default function Setor({
 
       {/* ===== MODAIS ===== */}
 
-      {/* MODAL FORMULÁRIO */}
+      {/* MODAL FORMULÁRIO COM SCANNER */}
       {mostrarForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -961,28 +998,52 @@ export default function Setor({
               <button onClick={fecharForm} className="text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"><X size={20} /></button>
             </div>
             <div className="px-6 py-6 space-y-5 max-h-[75vh] overflow-y-auto">
+              {/* CAMPO PRODUTO COM BUSCA E BOTÃO SCANNER */}
               <div>
                 <label className="text-xs font-medium text-gray-600">Produto *</label>
-                <input
-                  type="text"
-                  list="produtos-list"
-                  value={termoBusca}
-                  onChange={(e) => handleProdutoBusca(e.target.value)}
-                  onBlur={() => {
-                    if (termoBusca.trim() && !form.produto_id) {
-                      handleProdutoBusca(termoBusca);
-                    }
-                  }}
-                  placeholder="Digite o nome ou código do produto..."
-                  className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-shadow"
-                />
-                <datalist id="produtos-list">
-                  {produtos.map((p) => (
-                    <option key={p.id} value={`${p.codigo} - ${p.nome}`} />
-                  ))}
-                </datalist>
+                <div className="flex gap-2 mt-1">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      list="produtos-list"
+                      value={termoBusca}
+                      onChange={(e) => handleProdutoBusca(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (termoBusca.trim()) {
+                            handleProdutoBusca(termoBusca);
+                          }
+                        }
+                      }}
+                      onBlur={() => {
+                        if (termoBusca.trim() && !form.produto_id) {
+                          handleProdutoBusca(termoBusca);
+                        }
+                      }}
+                      placeholder="Digite o nome, código ou leia o código de barras..."
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-shadow"
+                    />
+                    <datalist id="produtos-list">
+                      {produtos.map((p) => (
+                        <option key={p.id} value={`${p.codigo} - ${p.nome}`} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMostrarScanner(true)}
+                    className="px-3 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition flex items-center justify-center"
+                    title="Ler código de barras"
+                  >
+                    <Camera size={20} />
+                  </button>
+                </div>
                 {form.produto_id && form.nome && (
                   <p className="text-xs text-green-600 mt-1">✅ Produto selecionado: {form.nome}</p>
+                )}
+                {scannerError && (
+                  <p className="text-xs text-red-600 mt-1">{scannerError}</p>
                 )}
               </div>
 
@@ -1022,6 +1083,7 @@ export default function Setor({
                 <div>
                   <label className="text-xs font-medium text-gray-600">Lote *</label>
                   <input
+                    id="lote-input"
                     value={form.lote}
                     onChange={(e) => setForm({ ...form, lote: e.target.value })}
                     className="w-full mt-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-shadow"
@@ -1068,6 +1130,62 @@ export default function Setor({
                   <Check size={16} /> {salvando ? "Salvando..." : "Salvar"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SCANNER */}
+      {mostrarScanner && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-800">📷 Ler código de barras</h3>
+              <button
+                onClick={() => {
+                  setMostrarScanner(false);
+                  setScannerError("");
+                }}
+                className="text-gray-500 hover:text-gray-700 p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4">
+              {scannerError && (
+                <div className="bg-red-50 text-red-600 text-sm p-2 rounded mb-3">
+                  {scannerError}
+                </div>
+              )}
+              <div className="aspect-square w-full max-h-80 mx-auto bg-black rounded-lg overflow-hidden">
+                <Scanner
+                  onScan={(data) => {
+                    if (data) {
+                      handleScanBarcode(data);
+                    }
+                  }}
+                  onError={(err) => {
+                    console.error(err);
+                    setScannerError("Erro ao acessar a câmera. Verifique as permissões.");
+                  }}
+                  constraints={{ facingMode: 'environment' }}
+                />
+              </div>
+              <p className="text-xs text-gray-400 text-center mt-2">
+                Aponte a câmera para o código de barras do produto
+              </p>
+              <p className="text-xs text-gray-400 text-center mt-1">
+                Ou clique em "Cancelar" para digitar manualmente
+              </p>
+              <button
+                onClick={() => {
+                  setMostrarScanner(false);
+                  setScannerError("");
+                }}
+                className="w-full mt-3 px-4 py-2 border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>
