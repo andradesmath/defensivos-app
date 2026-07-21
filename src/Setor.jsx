@@ -72,20 +72,29 @@ function corProgresso(pct) {
 }
 
 function getStatusInfo(item, minimoGlobal) {
-  if (item.vencido) return { label: "Vencido", class: "bg-red-100 text-red-700 border-red-300" };
-  if (item.proximoVencimento) return { label: `Vence em ${item.dias}d`, class: "bg-amber-100 text-amber-700 border-amber-300" };
-  if (item.estoqueBaixo || (minimoGlobal && item.quantidade < minimoGlobal)) 
+  // Se a quantidade for zero, não mostra alerta de vencimento ou estoque baixo
+  if (item.quantidade <= 0) {
+    return { label: "Zerado", class: "bg-gray-100 text-gray-500 border-gray-300" };
+  }
+  if (item.vencido) {
+    return { label: "Vencido", class: "bg-red-100 text-red-700 border-red-300" };
+  }
+  if (item.proximoVencimento) {
+    return { label: `Vence em ${item.dias}d`, class: "bg-amber-100 text-amber-700 border-amber-300" };
+  }
+  if (item.estoqueBaixo || (minimoGlobal && item.quantidade < minimoGlobal)) {
     return { label: "Estoque baixo", class: "bg-orange-100 text-orange-700 border-orange-300" };
+  }
   return { label: "OK", class: "bg-green-100 text-green-700 border-green-300" };
 }
 
-export default function Setor({ 
-  sessao, 
-  categoria, 
-  onVoltar, 
+export default function Setor({
+  sessao,
+  categoria,
+  onVoltar,
   onOpenLogsAcoes,
   onOpenMinimos,
-  onOpenCadastroProduto 
+  onOpenCadastroProduto
 }) {
   // ===== ESTADOS =====
   const [itens, setItens] = useState([]);
@@ -251,9 +260,9 @@ export default function Setor({
     const encontrado = produtos.find(p => {
       const codigoNome = `${p.codigo} - ${p.nome}`;
       return codigoNome.toLowerCase() === textoLimpo.toLowerCase() ||
-             p.nome.toLowerCase() === textoLimpo.toLowerCase() ||
-             p.codigo.toLowerCase() === textoLimpo.toLowerCase() ||
-             p.codigo.replace(/^0+/, '') === textoLimpo.replace(/^0+/, '');
+        p.nome.toLowerCase() === textoLimpo.toLowerCase() ||
+        p.codigo.toLowerCase() === textoLimpo.toLowerCase() ||
+        p.codigo.replace(/^0+/, '') === textoLimpo.replace(/^0+/, '');
     });
 
     if (encontrado) {
@@ -287,9 +296,9 @@ export default function Setor({
     let encontrado = produtos.find(p => {
       const codigoNome = `${p.codigo} - ${p.nome}`;
       return codigoNome.toLowerCase() === limpo ||
-             p.nome.toLowerCase() === limpo ||
-             p.codigo.toLowerCase() === limpo ||
-             p.codigo.replace(/^0+/, '') === limpo.replace(/^0+/, '');
+        p.nome.toLowerCase() === limpo ||
+        p.codigo.toLowerCase() === limpo ||
+        p.codigo.replace(/^0+/, '') === limpo.replace(/^0+/, '');
     });
     if (encontrado) return encontrado;
     encontrado = produtos.find(p =>
@@ -630,16 +639,17 @@ export default function Setor({
   }
 
   // ============================================================
-  // CÁLCULOS
+  // CÁLCULOS – CORRIGIDOS PARA NÃO GERAR ALERTAS EM ITENS ZERADOS
   // ============================================================
   const itensComStatus = useMemo(
     () =>
       itens.map((it) => {
         const dias = diasAte(it.validade);
-        const vencido = dias !== null && dias < 0;
-        const proximoVencimento = !vencido && dias !== null && dias <= DIAS_ALERTA_VENCIMENTO;
+        // Só considera vencido se a quantidade for maior que zero
+        const vencido = dias !== null && dias < 0 && it.quantidade > 0;
+        const proximoVencimento = !vencido && dias !== null && dias <= DIAS_ALERTA_VENCIMENTO && it.quantidade > 0;
         const minimoGlobal = it.produtos?.minimo_global || 0;
-        const estoqueBaixo = it.quantidade < minimoGlobal;
+        const estoqueBaixo = it.quantidade < minimoGlobal && it.quantidade > 0;
         return { ...it, dias, vencido, proximoVencimento, estoqueBaixo, minimoGlobal };
       }),
     [itens]
@@ -869,7 +879,7 @@ export default function Setor({
             </div>
           ) : (
             listaFiltrada.map((it) => {
-              const pct = it.minimoGlobal > 0 
+              const pct = it.minimoGlobal > 0
                 ? Math.min(100, Math.round((it.quantidade / (it.minimoGlobal * 2)) * 100))
                 : 100;
               const status = getStatusInfo(it, it.minimoGlobal);
@@ -888,8 +898,10 @@ export default function Setor({
                     <div className="grid grid-cols-2 gap-1 text-sm">
                       <span className="text-gray-500">Lote:</span><span className="font-medium text-gray-700 text-right">{it.lote}</span>
                       <span className="text-gray-500">Validade:</span><span className="font-medium text-gray-700 text-right">{formatarDataBR(it.validade)}</span>
-                      <span className="text-gray-500">Quantidade:</span><span className="font-medium text-gray-700 text-right">{it.quantidade} {it.unidade}</span>
-                      <span className="text-gray-500">Mínimo Global:</span><span className="font-medium text-gray-700 text-right">{it.minimoGlobal} {it.unidade}</span>
+                      <span className="text-gray-500">Quantidade:</span>
+                      <span className="font-medium text-gray-700 text-right">{it.quantidade} {it.unidade}</span>
+                      <span className="text-gray-500">Mínimo Global:</span>
+                      <span className="font-medium text-gray-700 text-right">{it.minimoGlobal} {it.unidade}</span>
                     </div>
                     <div className="mt-1 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full transition-all duration-500 ${corProgresso(pct)}`} style={{ width: `${pct}%` }} />
