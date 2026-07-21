@@ -3,10 +3,10 @@ import {
   AlertTriangle, AlertOctagon, PackageX, PackageMinus,
   ArrowLeftRight, Plus, Trash2, Pencil, X, Check,
   Search, History, MapPin, LogOut, ChevronLeft,
-  Sprout, Package, ClipboardList, Settings, Camera
-} from "lucide-react";
+  Sprout, Package, ClipboardList, Settings
+} from "lucide-react"; // <-- REMOVA "Camera" da importação
 import { supabase } from "./supabaseClient";
-import BarcodeScanner from "./BarcodeScanner"; // <-- importa o scanner
+import BarcodeScanner from "./BarcodeScanner";
 
 const DIAS_ALERTA_VENCIMENTO = 90;
 const UNIDADES = ["L", "mL", "kg", "g", "un", "M"];
@@ -1027,10 +1027,10 @@ export default function Setor({
                   <button
                     type="button"
                     onClick={() => setMostrarScanner(true)}
-                    className="px-3 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition flex items-center justify-center"
+                    className="px-3 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition flex items-center justify-center text-xl"
                     title="Ler código de barras"
                   >
-                    <Camera size={20} />
+                    📷
                   </button>
                 </div>
                 {form.produto_id && form.nome && (
@@ -1172,7 +1172,7 @@ export default function Setor({
         </div>
       )}
 
-      {/* MODAL RETIRAR */}
+      {/* MODAIS RETIRAR, TRANSFERIR, HISTÓRICO (mantidos) */}
       {mostrarRetirar && itemRetirar && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
@@ -1237,7 +1237,6 @@ export default function Setor({
         </div>
       )}
 
-      {/* MODAL TRANSFERIR */}
       {mostrarTransferir && itemTransferir && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
