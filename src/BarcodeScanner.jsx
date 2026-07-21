@@ -5,18 +5,31 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
   const [status, setStatus] = useState('inativo');
   const [errorMsg, setErrorMsg] = useState('');
   const scanDoneRef = useRef(false);
-  const intervalRef = useRef(null);
   const streamRef = useRef(null);
-  let readerInstance = null;
+  const readerRef = useRef(null);
+  const intervalRef = useRef(null);
 
-  // ========== INICIAR CÂMERA ==========
+  const pararScanner = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (readerRef.current) {
+      try { readerRef.current.reset(); } catch(e) {}
+      readerRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  };
+
   const iniciarCamera = async () => {
     setStatus('iniciando');
     setErrorMsg('');
     scanDoneRef.current = false;
 
     try {
-      // Solicita acesso à câmera
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 640 } }
       });
@@ -26,19 +39,19 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
         video.srcObject = stream;
         await video.play();
         setStatus('pronto');
-        
-        // Tenta usar BarcodeDetector (nativo) primeiro
+
+        // Tenta usar BarcodeDetector nativo (Chrome/Edge/Safari 16.4+)
         if ('BarcodeDetector' in window) {
           intervalRef.current = setInterval(() => {
             if (scanDoneRef.current) return;
-            capturarComBarcodeDetector(video);
+            capturarComDetectorNativo(video);
           }, 200);
         } else {
-          // Fallback para @zxing/browser
+          // Fallback para @zxing/browser (iPhone 8)
           try {
             const { BrowserMultiFormatReader } = await import('@zxing/browser');
             const reader = new BrowserMultiFormatReader();
-            readerInstance = reader;
+            readerRef.current = reader;
             await reader.decodeFromVideoDevice(
               { facingMode: 'environment' },
               video,
@@ -69,8 +82,6 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
         msg = 'Permissão negada. Clique no cadeado na barra de endereços e permita o acesso à câmera.';
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         msg = 'Nenhuma câmera encontrada.';
-      } else if (err.name === 'NotReadableError') {
-        msg = 'A câmera está sendo usada por outro aplicativo.';
       } else {
         msg = err.message || 'Erro desconhecido.';
       }
@@ -79,8 +90,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
     }
   };
 
-  // ========== CAPTURA COM BarcodeDetector (nativo) ==========
-  const capturarComBarcodeDetector = async (video) => {
+  const capturarComDetectorNativo = async (video) => {
     try {
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
@@ -102,34 +112,16 @@ export default function BarcodeScanner({ onScan, onError, onClose }) {
         }
       }
     } catch (err) {
-      // Silencia erros
+      // Ignora erros
     }
   };
 
-  // ========== PARAR SCANNER ==========
-  const pararScanner = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    if (readerInstance) {
-      try { readerInstance.reset(); } catch(e) {}
-      readerInstance = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-  };
-
-  // ========== CLEANUP ==========
   useEffect(() => {
     return () => {
       pararScanner();
     };
   }, []);
 
-  // ========== RENDER ==========
   return (
     <div className="relative w-full h-full bg-black rounded-xl overflow-hidden">
       <video ref={videoRef} className="w-full h-full object-cover" />
