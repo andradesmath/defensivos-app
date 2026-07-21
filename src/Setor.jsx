@@ -6,7 +6,7 @@ import {
   Sprout, Package, ClipboardList, Settings, Camera
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import BarcodeScanner from "./components/BarcodeScanner";
+import BarcodeScanner from "./BarcodeScanner";
 
 const DIAS_ALERTA_VENCIMENTO = 90;
 const UNIDADES = ["L", "mL", "kg", "g", "un", "M"];
